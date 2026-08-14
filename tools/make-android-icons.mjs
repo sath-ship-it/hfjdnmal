@@ -17,15 +17,16 @@ if (!existsSync(RES)) {
    malt bei adaptiven Icons Android selbst (ic_launcher_background). */
 const svg = (size, pad, mitGrund) => {
   const m = size * pad, w = size - 2 * m;
-  const oben = m + w * 0.24, unten = m + w * 0.76;
-  const x = (f) => m + w * f;
+  const d = w * 0.19, r = d * 0.28;
+  const x = (f) => m + w * f, y = (f) => m + w * f;
   return Buffer.from(
     `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
        ${mitGrund ? `<rect width="${size}" height="${size}" fill="${GELB}"/>` : ""}
-       <path d="M ${x(0)} ${oben} L ${x(0.25)} ${unten} L ${x(0.5)} ${oben + w * 0.26}
-                L ${x(0.75)} ${unten} L ${x(1)} ${oben}"
-             fill="none" stroke="${TINTE}" stroke-width="${w * 0.15}"
-             stroke-linejoin="round" stroke-linecap="round"/>
+       <g fill="${TINTE}">
+         <rect x="${x(0.06)}" y="${y(0)}"    width="${d}"        height="${w}" rx="${r}"/>
+         <rect x="${x(0.06)}" y="${y(0)}"    width="${w * 0.94}" height="${d}" rx="${r}"/>
+         <rect x="${x(0.06)}" y="${y(0.42)}" width="${w * 0.70}" height="${d}" rx="${r}"/>
+       </g>
      </svg>`
   );
 };

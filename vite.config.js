@@ -27,8 +27,8 @@ export default defineConfig({
       registerType: "prompt",
       includeAssets: ["icons/icon.svg", "icons/icon-192.png"],
       manifest: {
-        name: "WARO — Material & Aufmaß",
-        short_name: "WARO",
+        name: "FLUX — Material & Aufmaß",
+        short_name: "FLUX",
         description: "Baustellen-App für Material-Anforderung und Aufmaß",
         lang: "de",
         dir: "ltr",

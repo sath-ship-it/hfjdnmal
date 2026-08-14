@@ -1,4 +1,4 @@
-package de.waro.baustelle;
+package de.flux.baustelle;
 
 import com.getcapacitor.BridgeActivity;
 

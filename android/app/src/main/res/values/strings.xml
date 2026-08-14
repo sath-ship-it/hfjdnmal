@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">WARO</string>
-    <string name="title_activity_main">WARO</string>
-    <string name="package_name">de.waro.baustelle</string>
-    <string name="custom_url_scheme">de.waro.baustelle</string>
+    <string name="app_name">FLUX</string>
+    <string name="title_activity_main">FLUX</string>
+    <string name="package_name">de.flux.baustelle</string>
+    <string name="custom_url_scheme">de.flux.baustelle</string>
 </resources>

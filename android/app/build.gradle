@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "de.waro.baustelle"
+    namespace = "de.flux.baustelle"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "de.waro.baustelle"
+        applicationId "de.flux.baustelle"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         /* Die CI reicht die Lauf-Nummer durch. Ohne sie (lokaler Bau) bleibt es

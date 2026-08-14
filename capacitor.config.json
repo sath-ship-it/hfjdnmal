@@ -1,12 +1,12 @@
 {
-  "appId": "de.waro.baustelle",
-  "appName": "WARO",
+  "appId": "de.flux.baustelle",
+  "appName": "FLUX",
   "webDir": "dist",
   "android": {
     "allowMixedContent": false
   },
   "server": {
-    "url": "https://waro-baustelle.pages.dev/",
+    "url": "https://flux-baustelle.pages.dev/",
     "androidScheme": "https",
     "cleartext": false
   }

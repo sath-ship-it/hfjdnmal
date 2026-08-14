@@ -20,7 +20,7 @@ import { HinweisRahmen, useBald } from "./Hinweis.jsx";
 import { DatenZ, useDaten } from "./datenZ.js";
 
 /* ─────────────────────────────────────────────────────────────
-   WARO — Prototyp: Material & Aufmaß
+   FLUX — Material & Aufmaß
    ───────────────────────────────────────────────────────────── */
 
 const C = { ground:"#EFF2F1", surface:"#FFFFFF", ink:"#14181B", mute:"#5F6C73",

@@ -50,8 +50,8 @@ export default function Login() {
   return (
     <div className="wr-scroll wr-anmelde">
       <div className="wr-anmelde-kopf">
-        <span className="wr-marke">W</span>
-        <h1 className="wr-hero-h" style={{ marginTop: 16 }}>WARO</h1>
+        <span className="wr-marke">F</span>
+        <h1 className="wr-hero-h" style={{ marginTop: 16 }}>FLUX</h1>
         <p className="wr-sub">Material &amp; Aufmaß für die Baustelle</p>
       </div>
 
