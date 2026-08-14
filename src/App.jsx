@@ -5,6 +5,8 @@ import {
   Building2, Check, Ruler, FileText, Truck, Send, PenLine, Zap
 } from "lucide-react";
 import Aktualisierung from "./Aktualisierung.jsx";
+import Login from "./Login.jsx";
+import { useGespeichert, loesche } from "./speicher.js";
 
 /* ─────────────────────────────────────────────────────────────
    WARO — Prototyp: Material & Aufmaß
@@ -729,33 +731,9 @@ function Baustellen({ u, go }) {
 }
 
 /* ── Rahmen ──────────────────────────────────────────────── */
-export default function App() {
-  const [uid, setUid] = useState("dg");
-  const [tab, setTab] = useState("heute");
-  const [erf, setErf] = useState(null);
-  const [detail, setDetail] = useState(null);
-  const [laeuft, setLaeuft] = useState(true);
-  const [sek, setSek] = useState(13340);
-  const [anf, setAnf] = useState(ANF0);
-  const [zeilen, setZeilen] = useState(ZEILEN0);
-  const u = M(uid);
-
-  useEffect(() => { if (!laeuft) return; const i = setInterval(() => setSek((s) => s + 1), 1000); return () => clearInterval(i); }, [laeuft]);
-  useEffect(() => { setDetail(null); setErf(null); setTab("heute"); }, [uid]);
-
-  const senden = (bId, korb, wann, dringend) =>
-    setAnf([...korb.map((k, i) => ({ id:Date.now()+i, bId, aId:k.aId, menge:k.menge,
-      von:uid, wann, dringend, status:"Angefordert" })), ...anf]);
-
-  const nav = [
-    { k:"heute", l:"Heute", I:Home }, { k:"bau", l:"Baustellen", I:HardHat },
-    { k:"erf", l:"Erfassen", I:Plus }, { k:"mat", l:"Material", I:Package },
-    { k:"mehr", l:"Mehr", I:MoreHorizontal },
-  ];
-
-  return (
-    <div className="wr-root">
-      <style>{`
+/* Alle Stile an einer Stelle. Wird sowohl vom Anmeldebildschirm als auch
+   von der App selbst gebraucht, deshalb ausserhalb der Komponente. */
+const STIL = `
 @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
 .wr-root{--g:${C.ground};--s:${C.surface};--i:${C.ink};--m:${C.mute};--h:${C.hair};--y:${C.signal};
   font-family:'IBM Plex Sans',system-ui,sans-serif;color:var(--i);background:#20262A;min-height:100vh;
@@ -767,6 +745,17 @@ export default function App() {
 .wr-demo-b{flex:1;border:1px solid #38424A;background:none;color:#B4C0C6;border-radius:7px;padding:6px 4px;
   font-family:'Archivo',sans-serif;font-weight:600;font-size:11px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .wr-demo-b.on{background:var(--y);border-color:var(--y);color:#14181B;}
+.wr-demo-wer{flex:1;min-width:0;color:#DCE4E8;font-family:'Archivo',sans-serif;font-weight:600;font-size:11.5px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.wr-demo-ab{flex:none;border:1px solid #38424A;background:none;color:#B4C0C6;border-radius:7px;padding:5px 10px;
+  font-family:'Archivo',sans-serif;font-weight:600;font-size:11px;cursor:pointer;}
+.wr-anmelde{display:flex;flex-direction:column;}
+.wr-anmelde-kopf{padding:38px 18px 4px;}
+.wr-marke{display:flex;align-items:center;justify-content:center;width:56px;height:56px;border-radius:15px;
+  background:var(--y);color:var(--i);font-family:'Archivo',sans-serif;font-weight:800;font-size:30px;line-height:1;}
+.wr-fehler{display:flex;align-items:center;gap:8px;margin-top:10px;padding:10px 12px;background:#FBE4E1;
+  border-radius:9px;font-size:12.5px;color:${C.rot};}
+.wr-fehler svg{flex:none}
 .wr-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
 .wr-scroll::-webkit-scrollbar{width:0}
 .wr-hero{padding:24px 18px 12px;}
@@ -916,17 +905,57 @@ export default function App() {
 .wr-nav .on::before{content:'';position:absolute;top:-7px;left:50%;transform:translateX(-50%);width:24px;height:2.5px;
   background:var(--y);border-radius:2px;}
 .wr-root button:focus-visible,.wr-root a:focus-visible,.wr-root input:focus-visible,.wr-root select:focus-visible,
-.wr-root textarea:focus-visible{outline:2.5px solid ${C.signalDark};outline-offset:2px;}
-      `}</style>
+.wr-root textarea:focus-visible{outline:2.5px solid ${C.signalDark};outline-offset:2px;}`;
+
+export default function App() {
+  /* Angemeldet bleiben über das Schließen der App hinaus — niemand will
+     sich morgens auf dem Gerüst neu anmelden. */
+  const [uid, setUid] = useGespeichert("waro.angemeldet", null);
+  const [tab, setTab] = useState("heute");
+  const [erf, setErf] = useState(null);
+  const [detail, setDetail] = useState(null);
+  const [laeuft, setLaeuft] = useState(true);
+  const [sek, setSek] = useState(13340);
+  /* Erfasstes übersteht jetzt das Neuladen. Bis zum Server ist das
+     Gerät die einzige Ablage — deshalb hier und nicht in useState. */
+  const [anf, setAnf] = useGespeichert("waro.anforderungen", ANF0);
+  const [zeilen, setZeilen] = useGespeichert("waro.aufmass", ZEILEN0);
+  const u = uid ? M(uid) : null;
+
+  useEffect(() => { if (!laeuft) return; const i = setInterval(() => setSek((s) => s + 1), 1000); return () => clearInterval(i); }, [laeuft]);
+  useEffect(() => { setDetail(null); setErf(null); setTab("heute"); }, [uid]);
+
+  const abmelden = () => { setUid(null); setTab("heute"); };
+
+  /* Nicht angemeldet: nur der Anmeldebildschirm, sonst nichts. */
+  if (!u) {
+    return (
+      <div className="wr-root">
+        <style>{STIL}</style>
+        <div className="wr-phone"><Login anmelden={setUid} /></div>
+      </div>
+    );
+  }
+
+  const senden = (bId, korb, wann, dringend) =>
+    setAnf([...korb.map((k, i) => ({ id:Date.now()+i, bId, aId:k.aId, menge:k.menge,
+      von:uid, wann, dringend, status:"Angefordert" })), ...anf]);
+
+  const nav = [
+    { k:"heute", l:"Heute", I:Home }, { k:"bau", l:"Baustellen", I:HardHat },
+    { k:"erf", l:"Erfassen", I:Plus }, { k:"mat", l:"Material", I:Package },
+    { k:"mehr", l:"Mehr", I:MoreHorizontal },
+  ];
+
+  return (
+    <div className="wr-root">
+      <style>{STIL}</style>
 
       <div className="wr-phone">
         <div className="wr-demo">
-          <span className="wr-demo-l">Angemeldet</span>
-          {["dg", "ab", "ff"].map((id) => (
-            <button key={id} className={`wr-demo-b${uid === id ? " on" : ""}`} onClick={() => setUid(id)}>
-              {M(id).name.split(" ")[0]} · {M(id).zugang}
-            </button>
-          ))}
+          <span className="wr-demo-l">Angemeldet als</span>
+          <span className="wr-demo-wer">{u.name} · {u.zugang}</span>
+          <button className="wr-demo-ab" onClick={abmelden}>Abmelden</button>
         </div>
 
         {tab === "heute" && <Heute u={u} anf={anf} laeuft={laeuft} setLaeuft={setLaeuft} sek={sek}
@@ -957,6 +986,12 @@ export default function App() {
                 <div className="wr-task-s">{u.zugang} · {u.rolle}</div>
               </div>
             </div>
+            <button className="wr-order" onClick={abmelden}>Abmelden</button>
+            <button className="wr-order" onClick={() => {
+              /* Zum Vorführen: alles Erfasste weg, Ausgangsstand zurück. */
+              loesche("waro.anforderungen", "waro.aufmass");
+              setAnf(ANF0); setZeilen(ZEILEN0);
+            }}>Demodaten zurücksetzen</button>
             {rechte(u).leitung && (
               <>
                 <Eyebrow>Stammdaten</Eyebrow>
