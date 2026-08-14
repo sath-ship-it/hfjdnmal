@@ -29,8 +29,6 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Icons erzeugen
-        run: node tools/make-icons.mjs
       - name: Bauen
         # Cloudflare Pages liefert im Wurzelverzeichnis aus, daher "/".
         run: BASE_PATH=/ npm run build
@@ -112,10 +110,12 @@ jobs:
       - uses: android-actions/setup-android@v3
 
       - run: npm ci
-      - name: Icons erzeugen
-        run: node tools/make-icons.mjs && node tools/make-android-icons.mjs
+      # Die Web-Icons macht "npm run build" selbst; die Android-Icons
+      # brauchen das Projekt aus "cap add" und laufen deshalb getrennt.
       - name: Web-Teil bauen
         run: BASE_PATH=/ npm run build
+      - name: Android-Icons erzeugen
+        run: node tools/make-android-icons.mjs
       - name: Nach Android übertragen
         run: npx cap sync android
 
