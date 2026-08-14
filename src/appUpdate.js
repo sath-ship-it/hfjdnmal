@@ -59,9 +59,18 @@ export async function nachUpdateSehen() {
 
 /* Lädt und setzt die neue Fassung. Aktiv wird sie beim nächsten Start
    der App — deshalb meldet die Oberfläche danach "beim nächsten Öffnen". */
+/* Bricht ab, statt ewig zu haengen. Ein Paket von einem halben Megabyte
+   ist auch bei magerem Empfang in zwei Minuten da; laenger heisst, dass
+   etwas klemmt — und dann will man das sehen, nicht warten. */
+const mitFrist = (versprechen, ms, was) => Promise.race([
+  versprechen,
+  new Promise((_, weg) => setTimeout(() => weg(new Error(`${was} dauert zu lange — abgebrochen.`)), ms)),
+]);
+
 export async function updateLaden({ version, url }) {
   const M = await modul();
-  const paket = await M.download({ url, version });
+  const paket = await mitFrist(M.download({ url, version }), 120000, "Das Laden");
+  if (!paket?.id) throw new Error("Das Paket kam unvollständig an.");
   await M.set(paket);
   return version;
 }

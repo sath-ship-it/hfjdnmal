@@ -1129,6 +1129,7 @@ export default function App() {
   const [ansicht, setAnsicht] = useState(null);
   const [neueFassung, setNeueFassung] = useState(null);   // {version,url}
   const [ladeStand, setLadeStand] = useState("");          // "" | "laeuft" | "fertig"
+  const [updateFehler, setUpdateFehler] = useState("");
   const [jetzt, setJetzt] = useState(() => Date.now());
 
   /* Sitzung beobachten. supabase-js stellt sie aus dem Gerätespeicher
@@ -1190,9 +1191,13 @@ export default function App() {
 
   const updateHolen = async () => {
     if (!neueFassung || ladeStand === "laeuft") return;
-    setLadeStand("laeuft");
+    setLadeStand("laeuft"); setUpdateFehler("");
     try { await updateLaden(neueFassung); setLadeStand("fertig"); }
-    catch (e) { setLadeStand(""); throw e; }
+    catch (e) {
+      /* Frueher verschwand die Meldung ins Nichts und der Balken stand
+         ewig auf "Laedt" — genau das sah aus, als passiere nichts. */
+      setLadeStand(""); setUpdateFehler(e.message || "Laden fehlgeschlagen.");
+    }
   };
 
   const abmelden = async () => {
@@ -1383,6 +1388,14 @@ export default function App() {
               stamm={() => setStamm(true)} zeige={setAnsicht} />)}
 
         <Aktualisierung />
+
+        {updateFehler && (
+          <div className="wr-netz wr-netz-rot" role="alert">
+            <AlertTriangle size={14} />
+            <span>{updateFehler}</span>
+            <button className="wr-update-x" onClick={() => setUpdateFehler("")}>OK</button>
+          </div>
+        )}
 
         {neueFassung && (
           <div className="wr-update" role="status">
