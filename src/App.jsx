@@ -4,6 +4,7 @@ import {
   Phone, MapPin, Mic, Camera, Clock, Play, Square, X, Lock, AlertTriangle,
   Building2, Check, Ruler, FileText, Truck, Send, PenLine, Zap
 } from "lucide-react";
+import Aktualisierung from "./Aktualisierung.jsx";
 
 /* ─────────────────────────────────────────────────────────────
    WARO — Prototyp: Material & Aufmaß
@@ -759,7 +760,7 @@ export default function App() {
 .wr-root{--g:${C.ground};--s:${C.surface};--i:${C.ink};--m:${C.mute};--h:${C.hair};--y:${C.signal};
   font-family:'IBM Plex Sans',system-ui,sans-serif;color:var(--i);background:#20262A;min-height:100vh;
   display:flex;align-items:center;justify-content:center;}
-.wr-phone{width:100%;max-width:420px;height:100vh;background:var(--g);display:flex;flex-direction:column;overflow:hidden;}
+.wr-phone{width:100%;max-width:420px;height:100vh;height:100dvh;background:var(--g);display:flex;flex-direction:column;overflow:hidden;}
 @media(min-width:520px){.wr-root{padding:24px}.wr-phone{height:880px;max-height:94vh;border-radius:26px;box-shadow:0 24px 70px rgba(0,0,0,.5)}}
 .wr-demo{flex:none;background:#20262A;padding:8px 10px 9px;display:flex;align-items:center;gap:7px;}
 .wr-demo-l{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#7C8A91;flex:none;}
@@ -897,6 +898,16 @@ export default function App() {
 .wr-photo{width:66px;height:66px;border-radius:10px;flex:none;background:linear-gradient(135deg,#D6DEDC,#BFCAC7);}
 .wr-hint{font-size:11.5px;color:var(--m);line-height:1.45;margin:10px 2px 0;}
 .wr-empty{text-align:center;color:var(--m);font-size:13px;line-height:1.6;padding:28px 24px;}
+.wr-update{flex:none;display:flex;align-items:center;gap:9px;background:var(--y);color:var(--i);
+  padding:11px 13px;border-top:1px solid rgba(0,0,0,.12);}
+.wr-update svg{flex:none}
+.wr-update-t{flex:1;min-width:0;font-family:'Archivo',sans-serif;font-weight:700;font-size:12.5px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.wr-update-b{flex:none;border:none;background:var(--i);color:#fff;border-radius:7px;padding:7px 12px;
+  font-family:'Archivo',sans-serif;font-weight:700;font-size:12px;cursor:pointer;}
+.wr-update-x{flex:none;border:none;background:none;color:var(--i);opacity:.65;padding:7px 2px;
+  font-family:'Archivo',sans-serif;font-weight:600;font-size:12px;cursor:pointer;}
+.wr-update-ok{background:#E7EBEA;color:var(--m);}
 .wr-nav{display:flex;background:var(--s);border-top:1px solid var(--h);padding:7px 4px calc(7px + env(safe-area-inset-bottom));flex:none;}
 .wr-nav button{flex:1;background:none;border:none;padding:5px 2px 3px;display:flex;flex-direction:column;align-items:center;
   gap:3px;cursor:pointer;color:var(--m);position:relative;}
@@ -962,6 +973,8 @@ export default function App() {
             <div style={{ height:24 }} />
           </div>
         )}
+
+        <Aktualisierung />
 
         <nav className="wr-nav">
           {nav.map(({ k, l, I }) => (

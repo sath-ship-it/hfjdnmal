@@ -3,3 +3,19 @@ dist
 .DS_Store
 *.local
 .vite
+
+# Vom Service-Worker-Bau erzeugt
+dev-dist
+
+# Aus tools/make-icons.mjs erzeugt — gehört nicht in die Versionierung
+public/icons
+
+# Android: lokaler SDK-Pfad und Bau-Ergebnisse
+android/local.properties
+android/.gradle
+android/build
+android/app/build
+android/capacitor-cordova-android-plugins
+*.apk
+*.keystore
+*.jks

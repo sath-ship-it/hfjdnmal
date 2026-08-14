@@ -1,0 +1,13 @@
+{
+  "appId": "de.waro.baustelle",
+  "appName": "WARO",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": false
+  },
+  "server": {
+    "url": "https://sath-ship-it.github.io/hfjdnmal/",
+    "androidScheme": "https",
+    "cleartext": false
+  }
+}

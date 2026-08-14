@@ -1,0 +1,90 @@
+name: Web veröffentlichen und APK bauen
+
+on:
+  push:
+    branches: ["**"]
+  workflow_dispatch:
+
+# Für das Veröffentlichen auf GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Läuft ein Deploy noch, wird es nicht abgebrochen — sonst landet
+# halb Hochgeladenes auf der Seite.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  # ── Die Web-App: das ist der Teil, der sich selbst aktualisiert ──
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Icons erzeugen
+        run: node tools/make-icons.mjs
+      - name: Bauen
+        # Der Basis-Pfad muss zum Pages-Unterordner passen, sonst laufen
+        # alle Verweise und der Service-Worker-Scope ins Leere.
+        run: BASE_PATH="/${GITHUB_REPOSITORY#*/}/" npm run build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    # Nur der Hauptzweig geht live. Andere Zweige werden gebaut,
+    # damit man Fehler sieht, aber nicht veröffentlicht.
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    needs: web
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+  # ── Die Hülle: ändert sich selten, muss von Hand installiert werden ──
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v3
+
+      - run: npm ci
+      - name: Icons erzeugen
+        run: node tools/make-icons.mjs && node tools/make-android-icons.mjs
+      - name: Web-Teil bauen
+        run: BASE_PATH="/${GITHUB_REPOSITORY#*/}/" npm run build
+      - name: Nach Android übertragen
+        run: npx cap sync android
+
+      - name: APK bauen
+        working-directory: android
+        env:
+          # Bei jedem Lauf eine höhere Nummer, damit die neue Hülle
+          # über die alte installiert werden kann.
+          WARO_VERSION_CODE: ${{ github.run_number }}
+          WARO_VERSION_NAME: 1.0.${{ github.run_number }}
+        run: ./gradlew assembleDebug --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: waro-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error

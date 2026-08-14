@@ -1,37 +1,114 @@
-# WARO — Prototyp: Material & Aufmaß
+# WARO — Material & Aufmaß
 
-Interaktiver Prototyp einer Baustellen-App für Elektro-/Sicherheitstechnik.
-Mobiles Layout, deutschsprachig, mit Rollen-Umschalter zum Durchklicken.
+Baustellen-App für Elektro-/Sicherheitstechnik. Läuft im Browser, lässt sich
+auf dem Handy installieren und als Android-APK verteilen.
 
 ## Starten
 
 ```bash
 npm install
+node tools/make-icons.mjs   # einmalig, erzeugt public/icons
 npm run dev
 ```
 
-Dann http://localhost:5173 öffnen. Produktions-Build: `npm run build`.
+Dann http://localhost:5173 öffnen. Produktions-Build: `npm run build`,
+anschauen mit `npm run preview`.
+
+Der Service Worker ist nur im gebauten Stand aktiv. Wer das
+Aktualisierungs-Verhalten testen will, nimmt `npm run build && npm run preview`,
+nicht den Dev-Server.
 
 ## Aufbau
 
 | Datei | Inhalt |
 | --- | --- |
-| `src/App.jsx` | Kompletter Prototyp — Daten, Screens und CSS in einer Datei |
+| `src/App.jsx` | Der Prototyp — Daten, Screens und CSS in einer Datei |
+| `src/Aktualisierung.jsx` | Service-Worker-Anmeldung und der Update-Hinweis |
 | `src/main.jsx` | React-Einstiegspunkt |
-| `src/index.css` | Reset |
+| `vite.config.js` | Build und PWA-Einstellungen |
+| `capacitor.config.json` | Die Android-Hülle |
+| `tools/make-icons.mjs` | Web-Icons aus einer Vektorquelle |
+| `tools/make-android-icons.mjs` | Launcher-Icons für Android |
+| `.github/workflows/build.yml` | Veröffentlicht die Web-App, baut die APK |
 
-Alles steckt bewusst in `App.jsx`: Solange sich Datenmodell und Screens noch
-bewegen, ist eine Datei schneller zu ändern als zehn.
+## Wie die Aktualisierung funktioniert
+
+Es gibt **zwei Dinge, die sich aktualisieren können**, und sie verhalten sich
+völlig verschieden. Das ist der wichtigste Punkt an dieser Einrichtung:
+
+**Der Inhalt — aktualisiert sich selbst.** Die eigentliche App liegt auf
+GitHub Pages. Bei jedem Push baut die CI sie neu und veröffentlicht sie. Der
+Service Worker in der App merkt das, lädt die neue Fassung im Hintergrund und
+zeigt unten einen gelben Hinweis „Neue Fassung verfügbar". Geprüft wird beim
+Start, beim Zurückholen aus dem Hintergrund, stündlich und sobald das Netz
+zurückkommt.
+
+Bewusst wird **nie ungefragt neu geladen** (`registerType: "prompt"`). Wer
+gerade ein Aufmaß eintippt, verliert sonst mitten im Satz seine Eingabe. Der
+Monteur tippt auf „Jetzt laden", wenn es ihm passt — oder auf „Später".
+
+**Die Hülle — muss von Hand installiert werden.** Die APK ist nur ein dünner
+WebView um die gehostete Adresse. Sie enthält keinen App-Code, deshalb ändert
+sie sich praktisch nie. Wenn doch (Icon, Name, Android-Version), muss die neue
+APK verteilt und installiert werden. Eine seitlich installierte APK
+aktualisiert sich nicht selbst — das kann nur der Play Store.
+
+Praktisch heißt das: **Änderungen an der App erreichen alle Handys ohne
+Neuinstallation.** Nur bei Änderungen an der Hülle muss neu installiert werden.
+
+Ohne Netz startet die App trotzdem — alles Ausgelieferte ist vorab gecacht,
+inklusive Schriften. Auf einer Baustelle ist das der Normalfall, nicht die
+Ausnahme.
+
+## Einrichtung (einmalig)
+
+**1. GitHub Pages aktivieren.** Repo → Settings → Pages → Source auf
+**GitHub Actions** stellen. Ohne das schlägt der Deploy-Schritt fehl.
+
+**2. Adresse prüfen.** Die App landet auf
+`https://<benutzer>.github.io/<repo>/`. Genau diese Adresse muss in
+`capacitor.config.json` unter `server.url` stehen. Bei einem anderen Hosting
+dort ändern und die APK neu bauen.
+
+**3. APK holen.** Nach dem ersten grünen Lauf: Actions → letzter Lauf →
+Artefakte → `waro-apk`. Die Datei auf das Handy kopieren und öffnen. Android
+fragt einmal nach der Erlaubnis, Apps aus unbekannten Quellen zu installieren.
+
+## APK lokal bauen
+
+Braucht ein JDK 21 und das Android-SDK.
+
+```bash
+export ANDROID_HOME=~/android-sdk
+echo "sdk.dir=$ANDROID_HOME" > android/local.properties
+
+npm run build
+npx cap sync android
+cd android && ./gradlew assembleDebug
+```
+
+Ergebnis: `android/app/build/outputs/apk/debug/app-debug.apk`
+
+Die CI baut eine **Debug-APK**. Die lässt sich installieren und verteilen,
+trägt aber `debuggable` im Manifest und wird vom Play Store abgelehnt. Für
+eine echte Veröffentlichung braucht es einen Release-Build mit eigenem
+Schlüsselspeicher — der gehört in die CI-Secrets, nicht ins Repo.
+
+## Auf dem Handy installieren
+
+Ohne APK geht es auch: die Adresse im Browser öffnen und „Zum Startbildschirm
+hinzufügen" wählen. Dann läuft sie im Vollbild, mit Icon, offlinefähig und mit
+demselben Aktualisierungs-Verhalten. Das ist der schnellste Weg zum Testen.
 
 ## Rollen
 
-Oben in der dunklen Leiste lässt sich der angemeldete Nutzer wechseln. Der
-Zugang steuert, was sichtbar ist:
+Oben in der dunklen Leiste lässt sich der angemeldete Nutzer wechseln — nur
+zum Vorführen, in echt wäre man fest angemeldet.
 
-- **Leitung** (Daniil) — sieht alle Baustellen, Kundennamen, Stammdaten und
-  kann Anforderungen zu Bestellungen bündeln.
-- **Monteur / Azubi** (Alin, Felix) — sieht nur eigene Baustellen, fordert
-  Material an, sieht aber keine Preise und bestellt nicht selbst.
+- **Leitung** (Daniil) — alle Baustellen, Kundennamen, Stammdaten, kann
+  Anforderungen zu Bestellungen bündeln.
+- **Monteur / Azubi** (Alin, Felix) — nur eigene Baustellen, fordert Material
+  an, sieht keine Preise und bestellt nicht selbst.
 
 ## Fachliche Kernideen
 
@@ -56,5 +133,6 @@ keine Persistenz — ein Reload setzt alles zurück. Kamera, Mikrofon, PDF-Expor
 und Unterschrift sind als Oberfläche vorhanden, aber noch nicht verdrahtet
 (das Mikro simuliert eine Transkription nach zwei Sekunden).
 
-Schriften kommen per `@import` von Google Fonts; ohne Internet fällt die App
-auf Systemschriften zurück.
+Bekannter Fehler: Im Aufmaß meldet eine Baustelle ohne hinterlegte
+LV-Positionen „läuft pauschal" — das stimmt bei „Otto Hamburg" nicht, die wird
+nach Einheitspreisen abgerechnet. Die beiden Fälle sind noch nicht getrennt.
