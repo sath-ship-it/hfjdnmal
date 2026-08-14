@@ -18,6 +18,14 @@ const verstaendlich = (fehler) => {
   return fehler?.message || "Anmeldung fehlgeschlagen.";
 };
 
+/* Die drei Rollen. Nur zum Ausfüllen der Adresse — was jemand sieht,
+   entscheidet die Datenbank, nicht diese Liste. */
+const ROLLEN = [
+  { was:"Leitung",    mail:"gorlov.daniil@googlemail.com", sieht:"alles, Zugänge und Mitarbeiter" },
+  { was:"Buchhaltung",mail:"buchhaltung@waro.de",          sieht:"Preise und Kunden, keine Rechtevergabe" },
+  { was:"Monteur",    mail:"monteur@waro.de",              sieht:"eigene Baustellen, keine Preise" },
+];
+
 export default function Login() {
   const [mail, setMail] = useState("");
   const [pw, setPw] = useState("");
@@ -76,6 +84,23 @@ export default function Login() {
           in dieser App stehen Kundendaten.
         </p>
       </form>
+
+      <div className="wr-eyebrow" style={{ paddingBottom:4 }}><span>Zugänge zum Ausprobieren</span></div>
+      <div className="wr-pad" style={{ paddingTop:0 }}>
+        {ROLLEN.map((r) => (
+          <button key={r.mail} type="button" className="wr-hit"
+            onClick={() => { setMail(r.mail); setFehler(""); }}>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div className="wr-task-t">{r.was}</div>
+              <div className="wr-task-s">{r.mail} · {r.sieht}</div>
+            </div>
+          </button>
+        ))}
+        <p className="wr-hint">
+          Tippen füllt die Adresse ein. Das Passwort vergibt das Büro —
+          es steht bewusst nicht in der App.
+        </p>
+      </div>
       <div style={{ height: 24 }} />
     </div>
   );

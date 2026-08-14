@@ -31,7 +31,17 @@ const PHASE = { Anfrage:{c:"#9AA5AA"}, Angebot:{c:"#2F6FD0"}, Beauftragt:{c:"#8A
   "In Arbeit":{c:"#6FA22A"}, Abgenommen:{c:"#0E7C86"}, Abgerechnet:{c:"#2A3238"} };
 
 const ST_FARBE = { Angefordert:"#C0392B", Bestellt:"#C79E00", Geliefert:"#2F6FD0", Verbaut:"#6FA22A" };
-const rechte = (u) => ({ leitung: u.zugang === "Leitung" });
+/* Was eine Rolle darf. Die Datenbank entscheidet ohnehin selbst — das
+   hier steuert nur, was die Oberfläche zeigt und anbietet.
+
+   Leitung     alles, auch Zugänge und Mitarbeiter
+   Buchhalter  Preise, Kunden, Stunden — aber keine Rechtevergabe
+   Monteur     eigene Baustellen, keine Preise, keine Kundennamen
+   Azubi       wie Monteur                                            */
+const rechte = (u) => ({
+  leitung: u.zugang === "Leitung",
+  preise:  u.zugang === "Leitung" || u.zugang === "Buchhalter",
+});
 
 /* ── Datenzusammenhang ───────────────────────────────────────
    Alles kommt aus der Datenbank. Row Level Security entscheidet
@@ -58,6 +68,8 @@ function rechne(s) {
   return isFinite(v) ? Math.round(v * 100) / 100 : null;
 }
 const zahl = (n) => n.toLocaleString("de-DE", { maximumFractionDigits: 2 });
+const euro = (n) => n == null ? "—"
+  : n.toLocaleString("de-DE", { style:"currency", currency:"EUR" });
 
 /* ── Bausteine ───────────────────────────────────────────── */
 const Stripe = ({ phase, ruht }) => {
@@ -167,6 +179,7 @@ function Heute({ u, anf, go, laufend, stempeln, sek, toMat, kannZeit }) {
 function Anfordern({ u, back, senden }) {
   const bald = useBald();
   const { ARTIKEL, A, sichtbar } = useDaten();
+  const darfPreise = rechte(u).preise;
   const mein = sichtbar(u).filter((b) => b.phase === "In Arbeit" || b.phase === "Beauftragt");
   const [bs, setBs] = useState(mein[0]?.id);
   const [q, setQ] = useState("");
@@ -206,7 +219,9 @@ function Anfordern({ u, back, senden }) {
             <Plus size={15} color={C.mute} />
             <div style={{ flex:1, minWidth:0 }}>
               <div className="wr-task-t">{a.txt}</div>
-              <div className="wr-task-s">{a.lief} · {a.eh}</div>
+              <div className="wr-task-s">
+                {a.lief} · {a.eh}{darfPreise && a.ek != null ? ` · ${euro(a.ek)}` : ""}
+              </div>
             </div>
           </button>
         ))}
@@ -310,7 +325,11 @@ function Material({ u, anf, bestellenBei, toAnf }) {
           </div>
         </div>
         {x.dringend && x.status === "Angefordert" && <Zap size={14} color={C.rot} />}
-        <span className="wr-mono-b">{zahl(x.menge)}<span className="wr-mono-s"> {a.eh}</span></span>
+        <span style={{ textAlign:"right" }}>
+          <span className="wr-mono-b">{zahl(x.menge)}<span className="wr-mono-s"> {a.eh}</span></span>
+          {r.preise && a.ek != null &&
+            <div className="wr-mono-s">{euro(x.menge * a.ek)}</div>}
+        </span>
       </div>
     );
   };
@@ -368,6 +387,7 @@ function Material({ u, anf, bestellenBei, toAnf }) {
 /* ── Aufmaß ──────────────────────────────────────────────── */
 function Aufmass({ u, zeilen, speichern, fotoZu, blattSichern, aendern, loeschen, back }) {
   const { POS, sichtbar } = useDaten();
+  const darfPreise = rechte(u).preise;
   const [blatt, setBlatt] = useState(false);
   const mein = sichtbar(u).filter((b) => b.abrechnung === "Einheitspreise");
   const [bs, setBs] = useState(mein[0]?.id);
@@ -426,6 +446,12 @@ function Aufmass({ u, zeilen, speichern, fotoZu, blattSichern, aendern, loeschen
                 {ueber ? `${zahl(s - p.lv)} ${p.eh} über LV → Nachtrag` : `${pct} %`}
               </span>
             </div>
+            {darfPreise && p.ep != null && (
+              <div className="wr-row" style={{ marginTop:5 }}>
+                <span className="wr-mono-s">{euro(p.ep)} / {p.eh}</span>
+                <span className="wr-mono-b">{euro(s * p.ep)}</span>
+              </div>
+            )}
           </button>
         );
       })}
@@ -746,6 +772,16 @@ function Detail({ u, id, back, zeilen, anf }) {
             <dt>Ansprechpartner</dt><dd>{b.ap}</dd>
             <dt>Adresse</dt><dd>{b.adr}</dd>
             <dt>Abrechnung</dt><dd>{b.abrechnung}</dd>
+            {r.preise && pos.length > 0 && (<>
+              <dt>Auftragswert laut LV</dt>
+              <dd className="wr-mono">
+                {euro(pos.reduce((w, p) => w + (p.ep ?? 0) * p.lv, 0))}
+              </dd>
+              <dt>Erfasst</dt>
+              <dd className="wr-mono">
+                {euro(pos.reduce((w, p) => w + (p.ep ?? 0) * summe(p.id), 0))}
+              </dd>
+            </>)}
             <dt>Ausführung</dt><dd className="wr-mono">{b.von} – {b.bis}</dd>
           </dl>
           <Eyebrow>Zugeteilt</Eyebrow>
@@ -1385,7 +1421,7 @@ export default function App() {
           toAnf={() => { setTab("erf"); setErf("anford"); }} />}
 
         {tab === "mehr" && (
-          stamm ? <Stammdaten zurueck={() => setStamm(false)} ops={stammOps} />
+          stamm ? <Stammdaten zurueck={() => setStamm(false)} ops={stammOps} darf={rechte(u)} />
           : ansicht === "stunden"  ? <Stunden  u={u} zurueck={() => setAnsicht(null)} />
           : ansicht === "berichte" ? <Berichte zurueck={() => setAnsicht(null)} />
           : ansicht === "fotos"    ? <Fotos    zurueck={() => setAnsicht(null)} />

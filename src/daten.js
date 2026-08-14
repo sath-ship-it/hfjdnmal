@@ -53,7 +53,7 @@ export async function ladeAlles() {
     return data ?? [];
   };
 
-  const [betriebe, profile, baustellen, kaufm, crew, artikel, anforderungen, positionen, zeilen, zeiten, fotos, berichte] =
+  const [betriebe, profile, baustellen, kaufm, crew, artikel, anforderungen, positionen, zeilen, zeiten, fotos, berichte, lvPreise, artPreise] =
     await Promise.all([
       hole("betrieb", "id,name"),
       hole("profil", "id,name,kurz,rolle,zugang"),
@@ -67,6 +67,8 @@ export async function ladeAlles() {
       holeWennDa("zeit", "id,profil_id,baustelle_id,von,bis"),
       holeWennDa("foto", "id,zeile_id,bericht_id,baustelle_id,pfad,erstellt_am"),
       holeWennDa("tagesbericht", "id,baustelle_id,profil_id,datum,text"),
+      holeWennDa("lv_preis", "position_id,ep"),
+      holeWennDa("artikel_preis", "artikel_id,ek,vk"),
     ]);
 
   /* Kaufmännisches kommt nur bei der Leitung an — beim Monteur ist die
@@ -97,7 +99,18 @@ export async function ladeAlles() {
       heute: crew.filter((c) => c.baustelle_id === b.id && c.heute).map((c) => c.profil_id),
     }));
 
-  const ARTIKEL = artikel.map((a) => ({ id: a.id, txt: a.txt, eh: a.eh, lief: a.lief ?? "—" }));
+  /* Preise kommen nur an, wenn die Rolle sie sehen darf — ein Monteur
+     bekommt die Zeilen gar nicht erst geschickt. Der Unterschied
+     zwischen "keine Preise hinterlegt" und "darf ich nicht sehen" steckt
+     deshalb in koennen.preise, nicht in fehlenden Zahlen. */
+  const artPreisNach = Object.fromEntries((artPreise ?? []).map((p) => [p.artikel_id, p]));
+  const lvPreisNach  = Object.fromEntries((lvPreise ?? []).map((p) => [p.position_id, p]));
+
+  const ARTIKEL = artikel.map((a) => ({
+    id: a.id, txt: a.txt, eh: a.eh, lief: a.lief ?? "—",
+    ek: artPreisNach[a.id]?.ek != null ? Number(artPreisNach[a.id].ek) : null,
+    vk: artPreisNach[a.id]?.vk != null ? Number(artPreisNach[a.id].vk) : null,
+  }));
 
   const anf = anforderungen
     .filter((x) => !x.geloescht_am)
@@ -116,7 +129,8 @@ export async function ladeAlles() {
 
   const POS = positionen
     .filter((p) => !p.geloescht_am)
-    .map((p) => ({ id: p.id, bId: p.baustelle_id, nr: p.nr, txt: p.txt, eh: p.eh, lv: Number(p.lv) }));
+    .map((p) => ({ id: p.id, bId: p.baustelle_id, nr: p.nr, txt: p.txt, eh: p.eh, lv: Number(p.lv),
+                   ep: lvPreisNach[p.id]?.ep != null ? Number(lvPreisNach[p.id].ep) : null }));
 
   const ZEILEN = zeilen
     .filter((z) => !z.geloescht_am)
@@ -151,7 +165,8 @@ export async function ladeAlles() {
   if (!betriebId) throw new Error("Kein Betrieb sichtbar — Zugang unvollständig.");
 
     /* Was die Oberfläche ausgrauen muss, weil der Nachtrag fehlt. */
-  const koennen = { zeit: zeiten !== null, fotos: fotos !== null, berichte: berichte !== null };
+  const koennen = { zeit: zeiten !== null, fotos: fotos !== null, berichte: berichte !== null,
+                    preise: lvPreise !== null && lvPreise.length >= 0 && artPreise !== null };
 
   return { meinProfil, betriebId, betrieb: betriebe[0]?.name ?? "", team, B, ARTIKEL, anf, POS, ZEILEN,
            ZEITEN, BERICHTE, FOTOS, laufend, koennen };
@@ -317,22 +332,44 @@ export async function baustelleSpeichern(betriebId, f, id) {
   return bId;
 }
 
+const komma = (v) => {
+  if (v === "" || v == null) return null;
+  const n = Number(String(v).replace(",", "."));
+  return Number.isFinite(n) ? n : null;
+};
+
 export async function artikelSpeichern(betriebId, f, id) {
+  const aId = id ?? crypto.randomUUID();
   const { error } = await supabase.from("artikel").upsert({
-    id: id ?? crypto.randomUUID(), betrieb_id: betriebId,
+    id: aId, betrieb_id: betriebId,
     txt: f.txt.trim(), eh: f.eh.trim(), lief: f.lief?.trim() || null,
   });
   if (error) throw new Error(error.message);
+
+  /* Preise nur, wenn welche angegeben wurden. Ein Monteur bekommt die
+     Felder gar nicht zu sehen, und die Datenbank wiese ihn ohnehin ab. */
+  if (komma(f.ek) != null || komma(f.vk) != null) {
+    const { error: e2 } = await supabase.from("artikel_preis").upsert({
+      artikel_id: aId, betrieb_id: betriebId, ek: komma(f.ek), vk: komma(f.vk),
+    });
+    if (e2) throw new Error(e2.message);
+  }
 }
 
 export async function positionSpeichern(betriebId, baustelleId, f, id) {
+  const pId = id ?? crypto.randomUUID();
   const { error } = await supabase.from("lv_position").upsert({
-    id: id ?? crypto.randomUUID(), betrieb_id: betriebId, baustelle_id: baustelleId,
+    id: pId, betrieb_id: betriebId, baustelle_id: baustelleId,
     nr: f.nr.trim(), txt: f.txt.trim(), eh: f.eh.trim(), lv: Number(f.lv) || 0,
   });
   if (error) {
     if (error.code === "23505") throw new Error(`Position „${f.nr}“ gibt es auf dieser Baustelle schon.`);
     throw new Error(error.message);
+  }
+  if (komma(f.ep) != null) {
+    const { error: e2 } = await supabase.from("lv_preis")
+      .upsert({ position_id: pId, betrieb_id: betriebId, ep: komma(f.ep) });
+    if (e2) throw new Error(e2.message);
   }
 }
 

@@ -151,10 +151,12 @@ function Baustellen({ zurueck, speichern, crewSetzen }) {
   );
 }
 
+const euro = (n) => n == null ? "—" : n.toLocaleString("de-DE", { style:"currency", currency:"EUR" });
+
 /* ── Artikel ── */
-function Artikel({ zurueck, speichern }) {
+function Artikel({ zurueck, speichern, darfPreise }) {
   const { ARTIKEL } = useDaten();
-  const leer = { txt:"", eh:"St", lief:"" };
+  const leer = { txt:"", eh:"St", lief:"", ek:"", vk:"" };
   const [f, setF] = useState(leer);
   return (
     <Maske titel="Artikelstamm" unter="Was angefordert werden kann."
@@ -164,7 +166,10 @@ function Artikel({ zurueck, speichern }) {
         <div key={a.id} className="wr-task">
           <div style={{ flex:1, minWidth:0 }}>
             <div className="wr-task-t">{a.txt}</div>
-            <div className="wr-task-s">{a.lief} · {a.eh}</div>
+            <div className="wr-task-s">
+              {a.lief} · {a.eh}
+              {darfPreise && a.ek != null ? ` · EK ${euro(a.ek)} · VK ${euro(a.vk)}` : ""}
+            </div>
           </div>
         </div>
       )}
@@ -174,16 +179,22 @@ function Artikel({ zurueck, speichern }) {
         <Auswahl label="Einheit" wert={f.eh} setzen={(v) => setF({ ...f, eh:v })} werte={EINHEITEN} />
         <Feld label="Lieferant" value={f.lief} onChange={(e) => setF({ ...f, lief:e.target.value })}
           placeholder="Sonepar" />
+        {darfPreise && <>
+          <Feld label="Einkauf (netto)" value={f.ek} inputMode="decimal"
+            onChange={(e) => setF({ ...f, ek:e.target.value })} placeholder="2,35" />
+          <Feld label="Verkauf (netto)" value={f.vk} inputMode="decimal"
+            onChange={(e) => setF({ ...f, vk:e.target.value })} placeholder="3,90" />
+        </>}
       </>} />
   );
 }
 
 /* ── LV-Positionen ── */
-function Positionen({ zurueck, speichern }) {
+function Positionen({ zurueck, speichern, darfPreise }) {
   const { B, POS } = useDaten();
   const mitLV = B.filter((b) => b.abrechnung === "Einheitspreise");
   const [bs, setBs] = useState(mitLV[0]?.id ?? "");
-  const leer = { nr:"", txt:"", eh:"m", lv:"" };
+  const leer = { nr:"", txt:"", eh:"m", lv:"", ep:"" };
   const [f, setF] = useState(leer);
   const meine = POS.filter((p) => p.bId === bs);
 
@@ -197,7 +208,9 @@ function Positionen({ zurueck, speichern }) {
           <span className="wr-mono-s" style={{ width:44 }}>{p.nr}</span>
           <div style={{ flex:1, minWidth:0 }}>
             <div className="wr-task-t">{p.txt}</div>
-            <div className="wr-task-s">{p.lv} {p.eh} im LV</div>
+            <div className="wr-task-s">
+              {p.lv} {p.eh} im LV{darfPreise && p.ep != null ? ` · ${euro(p.ep)} / ${p.eh}` : ""}
+            </div>
           </div>
         </div>
       )}
@@ -210,6 +223,10 @@ function Positionen({ zurueck, speichern }) {
         <Auswahl label="Einheit" wert={f.eh} setzen={(v) => setF({ ...f, eh:v })} werte={EINHEITEN} />
         <Feld label="Menge laut LV" value={f.lv} onChange={(e) => setF({ ...f, lv:e.target.value })}
           inputMode="decimal" placeholder="180" />
+        {darfPreise && (
+          <Feld label="Einheitspreis (netto)" value={f.ep} inputMode="decimal"
+            onChange={(e) => setF({ ...f, ep:e.target.value })} placeholder="12,40" />
+        )}
         {mitLV.length === 0 && (
           <p className="wr-hint">
             Keine Baustelle mit Einheitspreisen vorhanden. Pauschalaufträge
@@ -254,20 +271,23 @@ function Mitarbeiter({ zurueck, speichern }) {
   );
 }
 
-export default function Stammdaten({ zurueck, ops }) {
+export default function Stammdaten({ zurueck, ops, darf }) {
   const [was, setWas] = useState(null);
   const { B, ARTIKEL, POS, team } = useDaten();
 
   if (was === "bau")  return <Baustellen zurueck={() => setWas(null)} speichern={ops.baustelle} crewSetzen={ops.crew} />;
-  if (was === "art")  return <Artikel    zurueck={() => setWas(null)} speichern={ops.artikel} />;
-  if (was === "lv")   return <Positionen zurueck={() => setWas(null)} speichern={ops.position} />;
+  if (was === "art")  return <Artikel    zurueck={() => setWas(null)} speichern={ops.artikel} darfPreise={darf.preise} />;
+  if (was === "lv")   return <Positionen zurueck={() => setWas(null)} speichern={ops.position} darfPreise={darf.preise} />;
   if (was === "team") return <Mitarbeiter zurueck={() => setWas(null)} speichern={ops.mitarbeiter} />;
 
+  /* Baustellen und Mitarbeiter bleiben bei der Leitung: Wer Zugaenge
+     vergeben kann, kann sich selbst welche geben. Die Datenbank weist
+     es ohnehin ab — hier wird es gar nicht erst angeboten. */
   const punkte = [
-    { k:"bau",  t:"Baustellen",           s:`${B.length} angelegt` },
+    ...(darf.leitung ? [{ k:"bau", t:"Baustellen", s:`${B.length} angelegt` }] : []),
     { k:"art",  t:"Artikelstamm",         s:`${ARTIKEL.length} Artikel` },
     { k:"lv",   t:"Leistungsverzeichnis", s:`${POS.length} Positionen` },
-    { k:"team", t:"Mitarbeiter",          s:`${team.length} im Betrieb` },
+    ...(darf.leitung ? [{ k:"team", t:"Mitarbeiter", s:`${team.length} im Betrieb` }] : []),
   ];
 
   return (
