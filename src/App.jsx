@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, createContext, useContext, useCallback } from "react";
 import {
   Home, HardHat, Plus, Package, MoreHorizontal, Search, ChevronLeft, ChevronRight,
   Phone, MapPin, Mic, Camera, Clock, Play, Square, X, Lock, AlertTriangle,
@@ -6,7 +6,8 @@ import {
 } from "lucide-react";
 import Aktualisierung from "./Aktualisierung.jsx";
 import Login from "./Login.jsx";
-import { useGespeichert, loesche } from "./speicher.js";
+import { supabase } from "./supabase.js";
+import { ladeAlles, anforderungSenden, aufmassSpeichern, bestellen } from "./daten.js";
 import { HinweisRahmen, useBald } from "./Hinweis.jsx";
 
 /* ─────────────────────────────────────────────────────────────
@@ -19,92 +20,24 @@ const C = { ground:"#EFF2F1", surface:"#FFFFFF", ink:"#14181B", mute:"#5F6C73",
 const PHASE = { Anfrage:{c:"#9AA5AA"}, Angebot:{c:"#2F6FD0"}, Beauftragt:{c:"#8A5A2B"},
   "In Arbeit":{c:"#6FA22A"}, Abgenommen:{c:"#0E7C86"}, Abgerechnet:{c:"#2A3238"} };
 
-const TEAM = [
-  { id:"dg", name:"Daniil Gorlov", kurz:"DG", rolle:"ME", zugang:"Leitung" },
-  { id:"mf", name:"Marco Feddern", kurz:"MF", rolle:"ME", zugang:"Leitung" },
-  { id:"ab", name:"Alin Borzasi", kurz:"AB", rolle:"TM", zugang:"Monteur" },
-  { id:"gn", name:"Goran Nikolic", kurz:"GN", rolle:"TM", zugang:"Monteur" },
-  { id:"ff", name:"Felix Fickenschär", kurz:"FF", rolle:"HA", zugang:"Azubi" },
-];
-const M = (id) => TEAM.find((t) => t.id === id);
-
-const B = [
-  { id:1, name:"Sparkasse Ahrensburg", nr:"P260024", phase:"In Arbeit", ruht:false,
-    adr:"Hamburger Straße 10, 22926 Ahrensburg", kunde:"Bosch Building Automation GmbH",
-    ap:"Thomas Robowsky", art:"Gewerbe", von:"03.08.", bis:"14.08.", soll:120, ist:96,
-    crew:["ab","ff","dg"], heute:["ab","ff"], abrechnung:"Einheitspreise" },
-  { id:2, name:"EFH Gärtnergasse 67", nr:"P260023", phase:"In Arbeit", ruht:false,
-    adr:"Gärtnergasse 67, 23562 Lübeck", kunde:"Johann Kühn", ap:"Johann Kühn",
-    art:"Privat", von:"10.07.", bis:"offen", soll:90, ist:74,
-    crew:["gn"], heute:["gn"], abrechnung:"Pauschal" },
-  { id:3, name:"Otto Hamburg", nr:"P260015", phase:"In Arbeit", ruht:true,
-    adr:"Bannwarthstraße, 22179 Hamburg", kunde:"Bosch Sicherheitssysteme GmbH",
-    ap:"Lars Bunsen", art:"Gewerbe", von:"19.04.", bis:"31.07.", soll:110, ist:118,
-    crew:["ab","dg"], heute:[], abrechnung:"Einheitspreise" },
-  { id:4, name:"City Center Ahrensburg", nr:"P260009", phase:"In Arbeit", ruht:true,
-    adr:"Klaus-Groth-Straße 1, 22926 Ahrensburg", kunde:"Bosch Sicherheitssysteme GmbH",
-    ap:"Christian Teegen", art:"Gewerbe", von:"20.03.", bis:"offen", soll:200, ist:187,
-    crew:["ab","gn","dg"], heute:[], abrechnung:"Einheitspreise" },
-  { id:8, name:"WNG Beckergrube 69", nr:"P260025", phase:"Beauftragt", ruht:false,
-    adr:"Beckergrube 69, 23552 Lübeck", kunde:"Thomas Witt", ap:"Thomas Witt",
-    art:"Privat", von:"01.09.", bis:"offen", soll:80, ist:0,
-    crew:["gn","ff"], heute:[], abrechnung:"Pauschal" },
-];
-
-/* Artikelstamm — käme später aus Datanorm vom Großhändler */
-const ARTIKEL = [
-  { id:"a1", txt:"NHXMH-J 5x2,5", eh:"m", lief:"Sonepar" },
-  { id:"a2", txt:"NYM-J 3x1,5", eh:"m", lief:"Sonepar" },
-  { id:"a3", txt:"JE-H(St)H 2x2x0,8 E30", eh:"m", lief:"Sonepar" },
-  { id:"a4", txt:"FI/LS-Kombi 16A B", eh:"St", lief:"Sonepar" },
-  { id:"a5", txt:"Kabelrinne 200 mm verzinkt", eh:"m", lief:"Rexel" },
-  { id:"a6", txt:"Kabelrinnendeckel 200 mm", eh:"m", lief:"Rexel" },
-  { id:"a7", txt:"BSK-Antrieb 24 V", eh:"St", lief:"Rexel" },
-  { id:"a8", txt:"Schraubanker 8x60", eh:"St", lief:"Rexel" },
-  { id:"a9", txt:"Kanalrauchmelder FCS-320-TM", eh:"St", lief:"Bosch direkt" },
-  { id:"a10", txt:"Handfeuermelder FMC-210", eh:"St", lief:"Bosch direkt" },
-];
-const A = (id) => ARTIKEL.find((x) => x.id === id);
-
-/* Anforderungen — der Lebenslauf einer Position */
-const ANF0 = [
-  { id:1, bId:1, aId:"a7", menge:6, von:"ab", wann:"Mo 17.08.", dringend:true, status:"Angefordert" },
-  { id:2, bId:1, aId:"a8", menge:120, von:"ab", wann:"Mo 17.08.", dringend:false, status:"Angefordert" },
-  { id:3, bId:1, aId:"a5", menge:40, von:"ab", wann:"Mi 19.08.", dringend:false, status:"Angefordert" },
-  { id:4, bId:4, aId:"a3", menge:200, von:"gn", wann:"Di 18.08.", dringend:false, status:"Angefordert" },
-  { id:5, bId:8, aId:"a4", menge:12, von:"gn", wann:"Fr 28.08.", dringend:false, status:"Angefordert" },
-  { id:6, bId:1, aId:"a9", menge:4, von:"ab", wann:"Do 20.08.", dringend:false, status:"Angefordert" },
-  { id:7, bId:1, aId:"a1", menge:300, von:"ab", wann:"12.08.", dringend:false, status:"Bestellt", lt:"Mo 17.08." },
-  { id:8, bId:2, aId:"a2", menge:500, von:"gn", wann:"11.08.", dringend:false, status:"Bestellt", lt:"Mo 17.08." },
-  { id:9, bId:1, aId:"a6", menge:24, von:"ab", wann:"08.08.", dringend:false, status:"Geliefert" },
-  { id:10, bId:1, aId:"a10", menge:8, von:"dg", wann:"05.08.", dringend:false, status:"Verbaut" },
-];
-
-/* Aufmaß — LV-Positionen und die dazugehörigen Ansätze */
-const POS0 = [
-  { id:"p1", bId:1, nr:"01.10", txt:"Kabel NHXMH-J 5x2,5 verlegen", eh:"m", lv:500 },
-  { id:"p2", bId:1, nr:"01.20", txt:"Kabelrinne 200 mm montieren", eh:"m", lv:180 },
-  { id:"p3", bId:1, nr:"02.10", txt:"Kanalrauchmelder montieren u. anschließen", eh:"St", lv:12 },
-  { id:"p4", bId:1, nr:"02.20", txt:"BSK-Antrieb anschließen", eh:"St", lv:24 },
-  { id:"p5", bId:1, nr:"03.10", txt:"Regiestunden Monteur", eh:"Std", lv:40 },
-  { id:"p6", bId:4, nr:"01.10", txt:"E90-Trasse montieren", eh:"m", lv:320 },
-  { id:"p7", bId:4, nr:"02.10", txt:"LSN-Ringbus verlegen", eh:"m", lv:800 },
-];
-const ZEILEN0 = [
-  { id:1, pId:"p1", ort:"EG Flur Nord", ansatz:"3 × 40", menge:120, foto:true, datum:"11.08." },
-  { id:2, pId:"p1", ort:"EG Flur Süd", ansatz:"2 × 45", menge:90, foto:true, datum:"11.08." },
-  { id:3, pId:"p1", ort:"1. OG Achse C", ansatz:"4 × 32,5", menge:130, foto:false, datum:"12.08." },
-  { id:4, pId:"p2", ort:"UG Trasse Hauptgang", ansatz:"24", menge:24, foto:true, datum:"10.08." },
-  { id:5, pId:"p2", ort:"EG Flur Nord", ansatz:"48", menge:48, foto:true, datum:"11.08." },
-  { id:6, pId:"p2", ort:"1. OG Flur", ansatz:"24", menge:24, foto:false, datum:"13.08." },
-  { id:7, pId:"p3", ort:"RLT-Gerät 1 + 2", ansatz:"2 × 4", menge:8, foto:true, datum:"13.08." },
-  { id:8, pId:"p4", ort:"EG Achse A–C", ansatz:"6", menge:6, foto:false, datum:"12.08." },
-  { id:9, pId:"p5", ort:"Umbau Bestand KW 32", ansatz:"2 × 11", menge:22, foto:false, datum:"08.08." },
-];
-
 const ST_FARBE = { Angefordert:"#C0392B", Bestellt:"#C79E00", Geliefert:"#2F6FD0", Verbaut:"#6FA22A" };
 const rechte = (u) => ({ leitung: u.zugang === "Leitung" });
-const sichtbar = (u) => rechte(u).leitung ? B : B.filter((b) => b.crew.includes(u.id));
+
+/* ── Datenzusammenhang ───────────────────────────────────────
+   Alles kommt aus der Datenbank. Row Level Security entscheidet
+   serverseitig, was ankommt — die Filter hier sind nur noch
+   Darstellung, kein Schutz. */
+const DatenZ = createContext(null);
+export const useDaten = () => useContext(DatenZ);
+
+function baueDaten(d) {
+  const M = (id) => d.team.find((t) => t.id === id) ?? { name:"—", kurz:"??", rolle:"", zugang:"Monteur" };
+  const A = (id) => d.ARTIKEL.find((x) => x.id === id) ?? { txt:"Unbekannter Artikel", eh:"", lief:"—" };
+  /* Die Leitung sieht alles, was ankommt; für andere zeigen wir nur die
+     eigenen Baustellen. Fremde kämen ohnehin nicht durch die Regeln. */
+  const sichtbar = (u) => rechte(u).leitung ? d.B : d.B.filter((b) => b.crew.includes(u.id));
+  return { ...d, M, A, sichtbar };
+}
 
 /* Ansatz-Rechner: "3 × 40" oder "12,5+8+4" — kein eval, nur + und × */
 function rechne(s) {
@@ -133,6 +66,7 @@ const Hinweis = ({ children }) => (
 
 /* ── Heute ───────────────────────────────────────────────── */
 function Heute({ u, anf, go, laeuft, setLaeuft, sek, toMat }) {
+  const { M, sichtbar } = useDaten();
   const r = rechte(u);
   const mein = sichtbar(u);
   const aktiv = mein.find((b) => b.heute.includes(u.id)) || mein[0];
@@ -206,12 +140,14 @@ function Heute({ u, anf, go, laeuft, setLaeuft, sek, toMat }) {
 /* ── Material anfordern (Monteur) ────────────────────────── */
 function Anfordern({ u, back, senden }) {
   const bald = useBald();
+  const { ARTIKEL, A, sichtbar } = useDaten();
   const mein = sichtbar(u).filter((b) => b.phase === "In Arbeit" || b.phase === "Beauftragt");
   const [bs, setBs] = useState(mein[0]?.id);
   const [q, setQ] = useState("");
   const [korb, setKorb] = useState([]);
   const [wann, setWann] = useState("Mo 17.08.");
   const [dringend, setDringend] = useState(false);
+  const [fehler, setFehler] = useState("");
 
   const treffer = q ? ARTIKEL.filter((a) => a.txt.toLowerCase().includes(q.toLowerCase())).slice(0, 5) : [];
   const add = (a) => { setKorb([...korb, { aId:a.id, menge:1 }]); setQ(""); };
@@ -298,9 +234,13 @@ function Anfordern({ u, back, senden }) {
 
         <button className="wr-btn-big" disabled={korb.length === 0}
           style={{ background: korb.length ? C.signal : "#E4E9E8", color: korb.length ? C.ink : C.mute, marginTop:18 }}
-          onClick={() => { senden(bs, korb, wann, dringend); back(); }}>
+          onClick={async () => {
+            try { await senden(bs, korb, wann, dringend); back(); }
+            catch (e) { setFehler(e.message || "Senden fehlgeschlagen."); }
+          }}>
           <Send size={16} /> Anforderung senden
         </button>
+        {fehler && <div className="wr-fehler" role="alert"><AlertTriangle size={15} /> {fehler}</div>}
         <p className="wr-hint">
           Landet sofort in der Sammelliste im Büro. Du siehst unter „Material“, wann sie bestellt wurde
           und wann sie kommt.
@@ -312,7 +252,8 @@ function Anfordern({ u, back, senden }) {
 }
 
 /* ── Material-Übersicht ──────────────────────────────────── */
-function Material({ u, anf, setAnf, toAnf }) {
+function Material({ u, anf, bestellenBei, toAnf }) {
+  const { M, A, B, sichtbar } = useDaten();
   const r = rechte(u);
   const [seg, setSeg] = useState("Angefordert");
   const mein = sichtbar(u).map((b) => b.id);
@@ -322,8 +263,14 @@ function Material({ u, anf, setAnf, toAnf }) {
   /* Leitung: nach Lieferant bündeln */
   const lieferanten = [...new Set(liste.map((x) => A(x.aId).lief))];
 
-  const bestellen = (lief) => setAnf(anf.map((x) =>
-    x.status === "Angefordert" && A(x.aId).lief === lief ? { ...x, status:"Bestellt", lt:"Di 18.08." } : x));
+  const [sendet, setSendet] = useState("");
+  const bestellen = async (lief) => {
+    setSendet(lief);
+    try {
+      await bestellenBei(anf.filter((x) => x.status === "Angefordert" && A(x.aId).lief === lief)
+        .map((x) => x.id));
+    } finally { setSendet(""); }
+  };
 
   const Zeile = ({ x }) => {
     const a = A(x.aId), b = B.find((y) => y.id === x.bId);
@@ -369,8 +316,9 @@ function Material({ u, anf, setAnf, toAnf }) {
               <div key={lief}>
                 <Eyebrow right={grp.length}>{lief}</Eyebrow>
                 {grp.map((x) => <Zeile key={x.id} x={x} />)}
-                <button className="wr-order" onClick={() => bestellen(lief)}>
-                  <Truck size={15} /> Bestellung an {lief} erzeugen
+                <button className="wr-order" disabled={sendet === lief}
+                  onClick={() => bestellen(lief)}>
+                  <Truck size={15} /> {sendet === lief ? "Wird gesendet …" : `Bestellung an ${lief} erzeugen`}
                 </button>
               </div>
             );
@@ -392,16 +340,17 @@ function Material({ u, anf, setAnf, toAnf }) {
 }
 
 /* ── Aufmaß ──────────────────────────────────────────────── */
-function Aufmass({ u, zeilen, setZeilen, back }) {
+function Aufmass({ u, zeilen, speichern, back }) {
   const bald = useBald();
+  const { POS, sichtbar } = useDaten();
   const mein = sichtbar(u).filter((b) => b.abrechnung === "Einheitspreise");
   const [bs, setBs] = useState(mein[0]?.id);
   const [posId, setPosId] = useState(null);
 
-  const pos = POS0.filter((p) => p.bId === bs);
+  const pos = POS.filter((p) => p.bId === bs);
   const summe = (pId) => zeilen.filter((z) => z.pId === pId).reduce((s, z) => s + z.menge, 0);
 
-  if (posId) return <AufmassPos posId={posId} zeilen={zeilen} setZeilen={setZeilen} back={() => setPosId(null)} />;
+  if (posId) return <AufmassPos posId={posId} zeilen={zeilen} speichern={speichern} back={() => setPosId(null)} />;
 
   return (
     <div className="wr-scroll">
@@ -464,19 +413,28 @@ function Aufmass({ u, zeilen, setZeilen, back }) {
   );
 }
 
-function AufmassPos({ posId, zeilen, setZeilen, back }) {
+function AufmassPos({ posId, zeilen, speichern, back }) {
   const bald = useBald();
-  const p = POS0.find((x) => x.id === posId);
+  const { POS } = useDaten();
+  const p = POS.find((x) => x.id === posId);
   const meine = zeilen.filter((z) => z.pId === posId);
   const s = meine.reduce((a, z) => a + z.menge, 0);
   const [ort, setOrt] = useState("");
   const [ansatz, setAnsatz] = useState("");
   const wert = rechne(ansatz);
 
-  const speichern = () => {
-    if (!wert || !ort.trim()) return;
-    setZeilen([...zeilen, { id:Date.now(), pId:posId, ort, ansatz, menge:wert, foto:false, datum:"14.08." }]);
-    setOrt(""); setAnsatz("");
+  const [sendet, setSendet] = useState(false);
+  const [fehler, setFehler] = useState("");
+
+  const sichern = async () => {
+    if (!wert || !ort.trim() || sendet) return;
+    setSendet(true); setFehler("");
+    try {
+      await speichern(posId, ort.trim(), ansatz, wert);
+      setOrt(""); setAnsatz("");
+    } catch (e) {
+      setFehler(e.message || "Speichern fehlgeschlagen.");
+    } finally { setSendet(false); }
   };
 
   return (
@@ -505,10 +463,12 @@ function AufmassPos({ posId, zeilen, setZeilen, back }) {
           <button className="wr-order" style={{ margin:0 }}
             onClick={() => bald("Das Foto")}><Camera size={15} /> Foto</button>
           <button className="wr-btn-big" style={{ background: wert && ort ? C.signal : "#E4E9E8",
-            color: wert && ort ? C.ink : C.mute, padding:"12px" }} onClick={speichern}>
-            Zeile speichern
+            color: wert && ort ? C.ink : C.mute, padding:"12px" }} onClick={sichern}
+            disabled={sendet}>
+            {sendet ? "Speichert …" : "Zeile speichern"}
           </button>
         </div>
+        {fehler && <div className="wr-fehler" role="alert"><AlertTriangle size={15} /> {fehler}</div>}
         <p className="wr-hint">
           Der Ansatz wird mitgespeichert, nicht nur das Ergebnis. Genau den will der Prüfer beim Kunden sehen.
         </p>
@@ -566,6 +526,7 @@ function Erfassen({ u, pick }) {
 /* ── Tagesbericht (gekürzt) ──────────────────────────────── */
 function Bericht({ u, back }) {
   const bald = useBald();
+  const { sichtbar } = useDaten();
   const mein = sichtbar(u).filter((b) => b.phase === "In Arbeit" || b.phase === "Beauftragt");
   const [txt, setTxt] = useState("");
   const [rec, setRec] = useState(false);
@@ -620,11 +581,12 @@ function Bericht({ u, back }) {
 /* ── Baustellen-Detail (mit Aufmaß-Tab) ──────────────────── */
 function Detail({ u, id, back, zeilen, anf }) {
   const bald = useBald();
+  const { M, A, B, POS } = useDaten();
   const r = rechte(u);
   const b = B.find((x) => x.id === id);
   const [tab, setTab] = useState("Übersicht");
   const p = PHASE[b.phase];
-  const pos = POS0.filter((x) => x.bId === b.id);
+  const pos = POS.filter((x) => x.bId === b.id);
   const mat = anf.filter((x) => x.bId === b.id);
   const summe = (pId) => zeilen.filter((z) => z.pId === pId).reduce((s, z) => s + z.menge, 0);
 
@@ -730,6 +692,7 @@ function Detail({ u, id, back, zeilen, anf }) {
 
 /* ── Baustellenliste ─────────────────────────────────────── */
 function Baustellen({ u, go }) {
+  const { sichtbar } = useDaten();
   const list = sichtbar(u);
   return (
     <div className="wr-scroll">
@@ -761,12 +724,13 @@ function Baustellen({ u, go }) {
 /* ── Mehr ────────────────────────────────────────────────── */
 /* Eigene Komponente, weil sie useBald() braucht: App stellt den
    Hinweis-Zusammenhang bereit und kann ihn deshalb nicht selbst lesen. */
-function Mehr({ u, abmelden, zuruecksetzen }) {
+function Mehr({ u, abmelden, betrieb, neuLaden }) {
   const bald = useBald();
+  const { ARTIKEL } = useDaten();
   return (
     <div className="wr-scroll">
       <div className="wr-hero"><h1 className="wr-hero-h">Mehr</h1></div>
-      <Eyebrow>Dein Zugang</Eyebrow>
+      <Eyebrow right={betrieb}>Dein Zugang</Eyebrow>
       <div className="wr-task">
         <span className="wr-av" style={{ background:C.ink, color:"#fff" }}>{u.kurz}</span>
         <div style={{ flex:1 }}>
@@ -775,7 +739,7 @@ function Mehr({ u, abmelden, zuruecksetzen }) {
         </div>
       </div>
       <button className="wr-order" onClick={abmelden}>Abmelden</button>
-      <button className="wr-order" onClick={zuruecksetzen}>Demodaten zurücksetzen</button>
+      <button className="wr-order" onClick={neuLaden}>Daten neu laden</button>
       {rechte(u).leitung && (
         <>
           <Eyebrow>Stammdaten</Eyebrow>
@@ -954,6 +918,11 @@ const STIL = `
 .wr-photo{width:66px;height:66px;border-radius:10px;flex:none;background:linear-gradient(135deg,#D6DEDC,#BFCAC7);}
 .wr-hint{font-size:11.5px;color:var(--m);line-height:1.45;margin:10px 2px 0;}
 .wr-empty{text-align:center;color:var(--m);font-size:13px;line-height:1.6;padding:28px 24px;}
+.wr-mitte{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:32px 24px;text-align:center;color:var(--m);font-size:14px;}
+.wr-dreht{animation:wrdreh 1s linear infinite}
+@keyframes wrdreh{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.wr-dreht{animation:none}}
 .wr-toast{position:absolute;left:14px;right:14px;bottom:74px;z-index:20;display:flex;align-items:center;gap:9px;
   background:var(--i);color:#fff;border-radius:11px;padding:12px 14px;font-size:12.5px;line-height:1.35;
   box-shadow:0 8px 24px rgba(0,0,0,.28);animation:wrein .18s ease-out;}
@@ -982,44 +951,81 @@ const STIL = `
 .wr-root textarea:focus-visible{outline:2.5px solid ${C.signalDark};outline-offset:2px;}`;
 
 export default function App() {
-  /* Angemeldet bleiben über das Schließen der App hinaus — niemand will
-     sich morgens auf dem Gerüst neu anmelden. */
-  const [uid, setUid] = useGespeichert("waro.angemeldet", null);
+  const [sitzung, setSitzung] = useState(undefined);   // undefined = wird noch geprüft
+  const [daten, setDaten] = useState(null);
+  const [ladefehler, setLadefehler] = useState("");
   const [tab, setTab] = useState("heute");
   const [erf, setErf] = useState(null);
   const [detail, setDetail] = useState(null);
   const [laeuft, setLaeuft] = useState(true);
   const [sek, setSek] = useState(13340);
-  /* Erfasstes übersteht jetzt das Neuladen. Bis zum Server ist das
-     Gerät die einzige Ablage — deshalb hier und nicht in useState. */
-  const [anf, setAnf] = useGespeichert("waro.anforderungen", ANF0);
-  const [zeilen, setZeilen] = useGespeichert("waro.aufmass", ZEILEN0);
-  const u = uid ? M(uid) : null;
+
+  /* Sitzung beobachten. supabase-js stellt sie aus dem Gerätespeicher
+     wieder her, deshalb bleibt man über das Schließen hinaus angemeldet. */
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSitzung(data.session ?? null));
+    const { data: abo } = supabase.auth.onAuthStateChange((_e, s) => setSitzung(s ?? null));
+    return () => abo.subscription.unsubscribe();
+  }, []);
+
+  const neuLaden = useCallback(async () => {
+    setLadefehler("");
+    try { setDaten(await ladeAlles()); }
+    catch (e) { setLadefehler(e.message || String(e)); }
+  }, []);
+
+  useEffect(() => {
+    if (!sitzung) { setDaten(null); return; }
+    neuLaden();
+  }, [sitzung, neuLaden]);
 
   useEffect(() => { if (!laeuft) return; const i = setInterval(() => setSek((s) => s + 1), 1000); return () => clearInterval(i); }, [laeuft]);
-  useEffect(() => { setDetail(null); setErf(null); setTab("heute"); }, [uid]);
 
-  const abmelden = () => { setUid(null); setTab("heute"); };
-
-  /* Zum Vorführen: alles Erfasste weg, Ausgangsstand zurück. */
-  const zuruecksetzen = () => {
-    loesche("waro.anforderungen", "waro.aufmass");
-    setAnf(ANF0); setZeilen(ZEILEN0);
+  const abmelden = async () => {
+    await supabase.auth.signOut();
+    setTab("heute"); setDetail(null); setErf(null);
   };
 
-  /* Nicht angemeldet: nur der Anmeldebildschirm, sonst nichts. */
-  if (!u) {
-    return (
-      <div className="wr-root">
-        <style>{STIL}</style>
-        <div className="wr-phone"><Login anmelden={setUid} /></div>
-      </div>
-    );
+  /* ── Zustände vor der eigentlichen App ── */
+  if (sitzung === undefined) {
+    return <div className="wr-root"><style>{STIL}</style>
+      <div className="wr-phone"><div className="wr-mitte">Einen Moment …</div></div></div>;
+  }
+  if (!sitzung) {
+    return <div className="wr-root"><style>{STIL}</style>
+      <div className="wr-phone"><Login /></div></div>;
+  }
+  if (ladefehler) {
+    return <div className="wr-root"><style>{STIL}</style>
+      <div className="wr-phone"><div className="wr-mitte">
+        <AlertTriangle size={24} color={C.rot} />
+        <p style={{ margin:"12px 0 0", fontSize:14, lineHeight:1.5 }}>{ladefehler}</p>
+        <button className="wr-order" style={{ width:"100%", margin:"16px 0 0" }}
+          onClick={neuLaden}>Nochmal versuchen</button>
+        <button className="wr-order" style={{ width:"100%" }} onClick={abmelden}>Abmelden</button>
+      </div></div></div>;
+  }
+  if (!daten) {
+    return <div className="wr-root"><style>{STIL}</style>
+      <div className="wr-phone"><div className="wr-mitte">Daten werden geladen …</div></div></div>;
   }
 
-  const senden = (bId, korb, wann, dringend) =>
-    setAnf([...korb.map((k, i) => ({ id:Date.now()+i, bId, aId:k.aId, menge:k.menge,
-      von:uid, wann, dringend, status:"Angefordert" })), ...anf]);
+  const D = baueDaten(daten);
+  const u = D.M(daten.meinProfil);
+
+  /* ── Schreiben: erst zum Server, dann neu laden ── */
+  const senden = async (bId, korb, wann, dringend) => {
+    await anforderungSenden(daten.betriebId, bId, korb, wann, dringend, daten.meinProfil);
+    await neuLaden();
+  };
+  const zeileSpeichern = async (posId, ort, ansatz, menge) => {
+    await aufmassSpeichern(daten.betriebId, posId, ort, ansatz, menge, daten.meinProfil);
+    await neuLaden();
+  };
+  const bestellenBei = async (ids) => {
+    await bestellen(ids, "Di 18.08.");
+    await neuLaden();
+  };
 
   const nav = [
     { k:"heute", l:"Heute", I:Home }, { k:"bau", l:"Baustellen", I:HardHat },
@@ -1032,6 +1038,7 @@ export default function App() {
       <style>{STIL}</style>
 
       <div className="wr-phone">
+       <DatenZ.Provider value={D}>
        <HinweisRahmen>
         <div className="wr-demo">
           <span className="wr-demo-l">Angemeldet als</span>
@@ -1039,24 +1046,24 @@ export default function App() {
           <button className="wr-demo-ab" onClick={abmelden}>Abmelden</button>
         </div>
 
-        {tab === "heute" && <Heute u={u} anf={anf} laeuft={laeuft} setLaeuft={setLaeuft} sek={sek}
+        {tab === "heute" && <Heute u={u} anf={daten.anf} laeuft={laeuft} setLaeuft={setLaeuft} sek={sek}
           go={(id) => { setDetail(id); setTab("bau"); }} toMat={() => setTab("mat")} />}
 
         {tab === "bau" && (detail
-          ? <Detail u={u} id={detail} back={() => setDetail(null)} zeilen={zeilen} anf={anf} />
+          ? <Detail u={u} id={detail} back={() => setDetail(null)} zeilen={daten.ZEILEN} anf={daten.anf} />
           : <Baustellen u={u} go={(id) => setDetail(id)} />)}
 
         {tab === "erf" && (
           erf === null ? <Erfassen u={u} pick={setErf} />
           : erf === "bericht" ? <Bericht u={u} back={() => setErf(null)} />
-          : erf === "aufmass" ? <Aufmass u={u} zeilen={zeilen} setZeilen={setZeilen} back={() => setErf(null)} />
+          : erf === "aufmass" ? <Aufmass u={u} zeilen={daten.ZEILEN} speichern={zeileSpeichern} back={() => setErf(null)} />
           : <Anfordern u={u} back={() => setErf(null)} senden={senden} />
         )}
 
-        {tab === "mat" && <Material u={u} anf={anf} setAnf={setAnf}
+        {tab === "mat" && <Material u={u} anf={daten.anf} bestellenBei={bestellenBei}
           toAnf={() => { setTab("erf"); setErf("anford"); }} />}
 
-        {tab === "mehr" && <Mehr u={u} abmelden={abmelden} zuruecksetzen={zuruecksetzen} />}
+        {tab === "mehr" && <Mehr u={u} abmelden={abmelden} betrieb={daten.betrieb} neuLaden={neuLaden} />}
 
         <Aktualisierung />
 
@@ -1078,6 +1085,7 @@ export default function App() {
           ))}
         </nav>
        </HinweisRahmen>
+       </DatenZ.Provider>
       </div>
     </div>
   );

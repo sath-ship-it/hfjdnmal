@@ -1,44 +1,43 @@
 import React, { useState } from "react";
-import { LogIn, AlertTriangle } from "lucide-react";
+import { LogIn, AlertTriangle, Loader } from "lucide-react";
+import { supabase } from "./supabase.js";
 
-/* ─────────────────────────────────────────────────────────────
-   Anmeldung — DEMO-BETRIEB.
+/* Anmeldung gegen Supabase. Die Prüfung läuft auf dem Server, und mit ihr
+   hängen die Rechteregeln zusammen: Was jemand sehen darf, entscheidet
+   ab hier die Datenbank, nicht die Oberfläche. */
 
-   Diese Prüfung läuft im Gerät gegen eine Liste im Code. Das ist
-   KEINE Sicherheit: Die Zugangsdaten stehen im ausgelieferten
-   JavaScript und sind für jeden lesbar, der hineinschaut.
+/* Supabase meldet Fehler auf Englisch und knapp. Für jemanden auf einer
+   Baustelle ist "Invalid login credentials" keine brauchbare Auskunft. */
+const verstaendlich = (fehler) => {
+  const t = (fehler?.message || "").toLowerCase();
+  if (t.includes("invalid login credentials")) return "E-Mail oder Passwort stimmt nicht.";
+  if (t.includes("email not confirmed")) return "Das Konto ist noch nicht bestätigt.";
+  if (t.includes("rate limit")) return "Zu viele Versuche. Kurz warten.";
+  if (t.includes("failed to fetch") || t.includes("network"))
+    return "Keine Verbindung. Bist du im Funkloch?";
+  return fehler?.message || "Anmeldung fehlgeschlagen.";
+};
 
-   Sie ersetzt vorerst den Rollen-Umschalter, damit sich die App beim
-   Vorführen wie eine echte anfühlt. Sobald die Datenbank steht,
-   antwortet hier supabase.auth.signInWithPassword() — der Bildschirm
-   bleibt, nur die Prüfung wandert auf den Server.
-   ───────────────────────────────────────────────────────────── */
-
-export const DEMO_ZUGAENGE = [
-  { uid: "dg", mail: "daniil@waro.de", pw: "waro", was: "Leitung" },
-  { uid: "ab", mail: "alin@waro.de",   pw: "waro", was: "Monteur" },
-  { uid: "ff", mail: "felix@waro.de",  pw: "waro", was: "Azubi" },
-];
-
-export default function Login({ anmelden }) {
+export default function Login() {
   const [mail, setMail] = useState("");
   const [pw, setPw] = useState("");
   const [fehler, setFehler] = useState("");
+  const [laeuft, setLaeuft] = useState(false);
 
-  const absenden = (e) => {
+  const absenden = async (e) => {
     e?.preventDefault();
-    const treffer = DEMO_ZUGAENGE.find(
-      (z) => z.mail.toLowerCase() === mail.trim().toLowerCase() && z.pw === pw
-    );
-    if (!treffer) {
-      setFehler("E-Mail oder Passwort stimmt nicht.");
-      return;
-    }
+    if (laeuft) return;
     setFehler("");
-    anmelden(treffer.uid);
+    setLaeuft(true);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: mail.trim(),
+      password: pw,
+    });
+    setLaeuft(false);
+    /* Bei Erfolg passiert hier nichts weiter: App hört auf die
+       Sitzungsänderung und schaltet selbst um. */
+    if (error) setFehler(verstaendlich(error));
   };
-
-  const schnell = (z) => { setMail(z.mail); setPw(z.pw); setFehler(""); };
 
   return (
     <div className="wr-scroll wr-anmelde">
@@ -51,7 +50,7 @@ export default function Login({ anmelden }) {
       <form className="wr-pad" onSubmit={absenden}>
         <label className="wr-lbl" htmlFor="mail">E-Mail</label>
         <input id="mail" className="wr-inp" type="email" inputMode="email"
-          autoComplete="username" value={mail}
+          autoComplete="username" autoCapitalize="none" value={mail}
           onChange={(e) => setMail(e.target.value)} placeholder="name@betrieb.de" />
 
         <label className="wr-lbl" htmlFor="pw">Passwort</label>
@@ -65,35 +64,18 @@ export default function Login({ anmelden }) {
           </div>
         )}
 
-        <button className="wr-btn-big" type="submit"
-          style={{ background: "#FFCC00", color: "#14181B", marginTop: 18 }}>
-          <LogIn size={17} /> Anmelden
+        <button className="wr-btn-big" type="submit" disabled={laeuft}
+          style={{ background: laeuft ? "#E4E9E8" : "#FFCC00",
+                   color: laeuft ? "#5F6C73" : "#14181B", marginTop: 18 }}>
+          {laeuft ? <Loader size={17} className="wr-dreht" /> : <LogIn size={17} />}
+          {laeuft ? "Wird geprüft …" : "Anmelden"}
         </button>
+
+        <p className="wr-hint">
+          Zugänge vergibt die Leitung. Eine Registrierung gibt es nicht —
+          in dieser App stehen Kundendaten.
+        </p>
       </form>
-
-      <div className="wr-eyebrow" style={{ paddingBottom: 4 }}>
-        <span>Demo-Zugänge — tippen zum Ausfüllen</span>
-      </div>
-      <div className="wr-pad" style={{ paddingTop: 0 }}>
-        {DEMO_ZUGAENGE.map((z) => (
-          <button key={z.uid} type="button" className="wr-hit"
-            onClick={() => schnell(z)}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="wr-task-t">{z.mail}</div>
-              <div className="wr-task-s">{z.was} · Passwort: {z.pw}</div>
-            </div>
-          </button>
-        ))}
-
-        <div className="wr-locked" style={{ margin: "14px 0 0" }}>
-          <AlertTriangle size={13} />
-          <span>
-            Demo-Anmeldung: Die Prüfung läuft im Gerät, die Zugangsdaten stehen
-            im Programmtext. Kein Schutz für echte Daten — das übernimmt später
-            der Server.
-          </span>
-        </div>
-      </div>
       <div style={{ height: 24 }} />
     </div>
   );
