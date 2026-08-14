@@ -256,3 +256,73 @@ export async function blattSpeichern(betriebId, baustelleId, unterzeichner, unte
   });
   if (error) throw new Error(error.message);
 }
+
+/* ── Stammdaten pflegen ──────────────────────────────────────
+   Bis hierher konnte man mit der App nur arbeiten, was ich als
+   Testdaten eingespielt hatte — keine neue Baustelle, kein neuer
+   Artikel. Schreiben darf laut Rechteregeln nur die Leitung. */
+
+export async function baustelleSpeichern(betriebId, f, id) {
+  const bId = id ?? crypto.randomUUID();
+  const satz = {
+    id: bId, betrieb_id: betriebId,
+    nr: f.nr.trim(), name: f.name.trim(), adr: f.adr?.trim() || null,
+    phase: f.phase, ruht: !!f.ruht, abrechnung: f.abrechnung,
+    von: f.von || null, bis: f.bis || null,
+  };
+  const { error } = await supabase.from("baustelle").upsert(satz);
+  if (error) {
+    if (error.code === "23505") throw new Error(`Nummer „${f.nr}“ gibt es schon.`);
+    throw new Error(error.message);
+  }
+  /* Kundendaten liegen getrennt, damit Monteure sie nicht bekommen. */
+  const { error: e2 } = await supabase.from("baustelle_kaufmaennisch").upsert({
+    baustelle_id: bId, betrieb_id: betriebId,
+    kunde: f.kunde?.trim() || null, ap: f.ap?.trim() || null,
+    telefon: f.telefon?.trim() || null,
+  });
+  if (e2) throw new Error(e2.message);
+  return bId;
+}
+
+export async function artikelSpeichern(betriebId, f, id) {
+  const { error } = await supabase.from("artikel").upsert({
+    id: id ?? crypto.randomUUID(), betrieb_id: betriebId,
+    txt: f.txt.trim(), eh: f.eh.trim(), lief: f.lief?.trim() || null,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function positionSpeichern(betriebId, baustelleId, f, id) {
+  const { error } = await supabase.from("lv_position").upsert({
+    id: id ?? crypto.randomUUID(), betrieb_id: betriebId, baustelle_id: baustelleId,
+    nr: f.nr.trim(), txt: f.txt.trim(), eh: f.eh.trim(), lv: Number(f.lv) || 0,
+  });
+  if (error) {
+    if (error.code === "23505") throw new Error(`Position „${f.nr}“ gibt es auf dieser Baustelle schon.`);
+    throw new Error(error.message);
+  }
+}
+
+/* Zuteilung: wer die Baustelle sieht. Ohne Eintrag hier bekommt ein
+   Monteur sie gar nicht erst geschickt. */
+export async function crewSetzen(betriebId, baustelleId, profilIds) {
+  const { error: eDel } = await supabase.from("baustelle_crew")
+    .delete().eq("baustelle_id", baustelleId);
+  if (eDel) throw new Error(eDel.message);
+  if (profilIds.length === 0) return;
+  const { error } = await supabase.from("baustelle_crew").insert(
+    profilIds.map((p) => ({ baustelle_id: baustelleId, profil_id: p, betrieb_id: betriebId })));
+  if (error) throw new Error(error.message);
+}
+
+/* Mitarbeiter ohne Zugang: existiert im Betrieb, hat aber (noch) kein
+   Anmeldekonto. Genau dafuer ist profil.auth_id optional. */
+export async function mitarbeiterSpeichern(betriebId, f, id) {
+  const { error } = await supabase.from("profil").upsert({
+    id: id ?? crypto.randomUUID(), betrieb_id: betriebId,
+    name: f.name.trim(), kurz: f.kurz.trim().toUpperCase(),
+    rolle: f.rolle?.trim() || null, zugang: f.zugang,
+  });
+  if (error) throw new Error(error.message);
+}

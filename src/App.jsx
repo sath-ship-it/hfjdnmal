@@ -8,9 +8,12 @@ import Aktualisierung from "./Aktualisierung.jsx";
 import Login from "./Login.jsx";
 import FotoKnopf from "./Foto.jsx";
 import Aufmassblatt from "./Aufmassblatt.jsx";
+import Stammdaten from "./Stammdaten.jsx";
 import { supabase } from "./supabase.js";
 import { ladeAlles, anforderungSenden, aufmassSpeichern, bestellen,
-  einstempeln, ausstempeln, berichtSpeichern, fotoHochladen, blattSpeichern } from "./daten.js";
+  einstempeln, ausstempeln, berichtSpeichern, fotoHochladen, blattSpeichern,
+  baustelleSpeichern, artikelSpeichern, positionSpeichern, crewSetzen,
+  mitarbeiterSpeichern } from "./daten.js";
 import { HinweisRahmen, useBald } from "./Hinweis.jsx";
 
 /* ─────────────────────────────────────────────────────────────
@@ -30,7 +33,7 @@ const rechte = (u) => ({ leitung: u.zugang === "Leitung" });
    Alles kommt aus der Datenbank. Row Level Security entscheidet
    serverseitig, was ankommt — die Filter hier sind nur noch
    Darstellung, kein Schutz. */
-const DatenZ = createContext(null);
+export const DatenZ = createContext(null);
 export const useDaten = () => useContext(DatenZ);
 
 function baueDaten(d) {
@@ -771,9 +774,8 @@ function Baustellen({ u, go }) {
 /* ── Mehr ────────────────────────────────────────────────── */
 /* Eigene Komponente, weil sie useBald() braucht: App stellt den
    Hinweis-Zusammenhang bereit und kann ihn deshalb nicht selbst lesen. */
-function Mehr({ u, abmelden, betrieb, neuLaden }) {
-  const bald = useBald();
-  const { ARTIKEL } = useDaten();
+function Mehr({ u, abmelden, betrieb, neuLaden, stamm }) {
+  const { ARTIKEL, B, POS } = useDaten();
   return (
     <div className="wr-scroll">
       <div className="wr-hero"><h1 className="wr-hero-h">Mehr</h1></div>
@@ -790,18 +792,16 @@ function Mehr({ u, abmelden, betrieb, neuLaden }) {
       {rechte(u).leitung && (
         <>
           <Eyebrow>Stammdaten</Eyebrow>
-          {[{ I:Building2, t:"Kunden", s:"22 angelegt" },
-            { I:Package, t:"Artikelstamm", s:`${ARTIKEL.length} Artikel · Datanorm-Import` },
-            { I:Ruler, t:"Leistungsverzeichnisse", s:"GAEB-Import" }].map(({ I, t, s }) => (
-            <button key={t} className="wr-task" style={{ cursor:"pointer" }}
-              onClick={() => bald(`Die Pflege von „${t}“`)}>
-              <span className="wr-icon"><I size={15} /></span>
-              <div style={{ flex:1, textAlign:"left" }}>
-                <div className="wr-task-t">{t}</div><div className="wr-task-s">{s}</div>
+          <button className="wr-task" style={{ cursor:"pointer" }} onClick={stamm}>
+            <span className="wr-icon"><Building2 size={15} /></span>
+            <div style={{ flex:1, textAlign:"left" }}>
+              <div className="wr-task-t">Anlegen und ändern</div>
+              <div className="wr-task-s">
+                {B.length} Baustellen · {ARTIKEL.length} Artikel · {POS.length} LV-Positionen
               </div>
-              <ChevronRight size={16} color={C.mute} />
-            </button>
-          ))}
+            </div>
+            <ChevronRight size={16} color={C.mute} />
+          </button>
         </>
       )}
       <div style={{ height:24 }} />
@@ -1027,6 +1027,7 @@ export default function App() {
   const [tab, setTab] = useState("heute");
   const [erf, setErf] = useState(null);
   const [detail, setDetail] = useState(null);
+  const [stamm, setStamm] = useState(false);
   const [jetzt, setJetzt] = useState(() => Date.now());
 
   /* Sitzung beobachten. supabase-js stellt sie aus dem Gerätespeicher
@@ -1124,6 +1125,17 @@ export default function App() {
     await neuLaden();
   };
 
+  /* Stammdaten: nach jedem Schreiben neu laden, damit die Listen und
+     alle anderen Bildschirme sofort stimmen. */
+  const nachher = (fn) => async (...a) => { const r = await fn(...a); await neuLaden(); return r; };
+  const stammOps = {
+    baustelle:   nachher((f) => baustelleSpeichern(daten.betriebId, f)),
+    crew:        nachher((bId, ids) => crewSetzen(daten.betriebId, bId, ids)),
+    artikel:     nachher((f) => artikelSpeichern(daten.betriebId, f)),
+    position:    nachher((bId, f) => positionSpeichern(daten.betriebId, bId, f)),
+    mitarbeiter: nachher((f) => mitarbeiterSpeichern(daten.betriebId, f)),
+  };
+
   const fotoZu = async (baustelleId, zeileId, datei, berichtId) => {
     await fotoHochladen(datei, {
       betriebId: daten.betriebId, baustelleId,
@@ -1171,7 +1183,9 @@ export default function App() {
         {tab === "mat" && <Material u={u} anf={daten.anf} bestellenBei={bestellenBei}
           toAnf={() => { setTab("erf"); setErf("anford"); }} />}
 
-        {tab === "mehr" && <Mehr u={u} abmelden={abmelden} betrieb={daten.betrieb} neuLaden={neuLaden} />}
+        {tab === "mehr" && (stamm
+          ? <Stammdaten zurueck={() => setStamm(false)} ops={stammOps} />
+          : <Mehr u={u} abmelden={abmelden} betrieb={daten.betrieb} neuLaden={neuLaden} stamm={() => setStamm(true)} />)}
 
         <Aktualisierung />
 
