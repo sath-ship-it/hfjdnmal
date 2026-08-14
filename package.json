@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@capacitor/core": "^8.5.0",
+    "@capacitor/status-bar": "^8.0.3",
     "@supabase/supabase-js": "^2.112.3",
     "lucide-react": "^0.460.0",
     "react": "^19.0.0",

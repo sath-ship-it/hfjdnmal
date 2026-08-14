@@ -813,12 +813,12 @@ function Mehr({ u, abmelden, betrieb, neuLaden, stamm }) {
    von der App selbst gebraucht, deshalb ausserhalb der Komponente. */
 export const STIL = `
 @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
-.wr-root{--g:${C.ground};--s:${C.surface};--i:${C.ink};--m:${C.mute};--h:${C.hair};--y:${C.signal};
+.wr-root{--oben:env(safe-area-inset-top,0px);--unten:env(safe-area-inset-bottom,0px);--g:${C.ground};--s:${C.surface};--i:${C.ink};--m:${C.mute};--h:${C.hair};--y:${C.signal};
   font-family:'IBM Plex Sans',system-ui,sans-serif;color:var(--i);background:#20262A;min-height:100vh;
   display:flex;align-items:center;justify-content:center;}
 .wr-phone{width:100%;max-width:420px;height:100vh;height:100dvh;background:var(--g);display:flex;flex-direction:column;overflow:hidden;}
 @media(min-width:520px){.wr-root{padding:24px}.wr-phone{height:880px;max-height:94vh;border-radius:26px;box-shadow:0 24px 70px rgba(0,0,0,.5)}}
-.wr-demo{flex:none;background:#20262A;padding:8px 10px 9px;display:flex;align-items:center;gap:7px;}
+.wr-demo{flex:none;background:#20262A;padding:calc(8px + var(--oben)) 10px 9px;display:flex;align-items:center;gap:7px;}
 .wr-demo-l{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#7C8A91;flex:none;}
 .wr-demo-b{flex:1;border:1px solid #38424A;background:none;color:#B4C0C6;border-radius:7px;padding:6px 4px;
   font-family:'Archivo',sans-serif;font-weight:600;font-size:11px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -828,7 +828,7 @@ export const STIL = `
 .wr-demo-ab{flex:none;border:1px solid #38424A;background:none;color:#B4C0C6;border-radius:7px;padding:5px 10px;
   font-family:'Archivo',sans-serif;font-weight:600;font-size:11px;cursor:pointer;}
 .wr-anmelde{display:flex;flex-direction:column;}
-.wr-anmelde-kopf{padding:38px 18px 4px;}
+.wr-anmelde-kopf{padding:calc(38px + var(--oben)) 18px 4px;}
 .wr-marke{display:flex;align-items:center;justify-content:center;width:56px;height:56px;border-radius:15px;
   background:var(--y);color:var(--i);font-family:'Archivo',sans-serif;font-weight:800;font-size:30px;line-height:1;}
 .wr-fehler{display:flex;align-items:center;gap:8px;margin-top:10px;padding:10px 12px;background:#FBE4E1;
@@ -988,6 +988,7 @@ export const STIL = `
   #wr-blatt, #wr-blatt *{visibility:visible!important}
   #wr-blatt{position:absolute;left:0;top:0;width:100%;margin:0;border:none;border-radius:0;}
 }
+.wr-phone{padding-bottom:0}
 .wr-mitte{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
   padding:32px 24px;text-align:center;color:var(--m);font-size:14px;}
 .wr-dreht{animation:wrdreh 1s linear infinite}
@@ -1010,7 +1011,7 @@ export const STIL = `
 .wr-update-x{flex:none;border:none;background:none;color:var(--i);opacity:.65;padding:7px 2px;
   font-family:'Archivo',sans-serif;font-weight:600;font-size:12px;cursor:pointer;}
 .wr-update-ok{background:#E7EBEA;color:var(--m);}
-.wr-nav{display:flex;background:var(--s);border-top:1px solid var(--h);padding:7px 4px calc(7px + env(safe-area-inset-bottom));flex:none;}
+.wr-nav{display:flex;background:var(--s);border-top:1px solid var(--h);padding:7px 4px calc(7px + var(--unten));flex:none;}
 .wr-nav button{flex:1;background:none;border:none;padding:5px 2px 3px;display:flex;flex-direction:column;align-items:center;
   gap:3px;cursor:pointer;color:var(--m);position:relative;}
 .wr-nav button span{font-family:'Archivo',sans-serif;font-weight:600;font-size:9.5px;}
