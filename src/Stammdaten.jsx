@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { ChevronLeft, ChevronRight, Plus, AlertTriangle, Check } from "lucide-react";
-import { useDaten } from "./App.jsx";
+import { useDaten } from "./datenZ.js";
 
 /* ─────────────────────────────────────────────────────────────
    Stammdaten anlegen und ändern.

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { ChevronLeft, Clock, FileText, Camera, AlertTriangle } from "lucide-react";
-import { useDaten } from "./App.jsx";
+import { useDaten } from "./datenZ.js";
 import { fotoAdressen } from "./daten.js";
 
 /* ─────────────────────────────────────────────────────────────

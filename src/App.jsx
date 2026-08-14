@@ -1,4 +1,4 @@
-import React, { useState, useEffect, createContext, useContext, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Home, HardHat, Plus, Package, MoreHorizontal, Search, ChevronLeft, ChevronRight,
   Phone, MapPin, Mic, Camera, Clock, Play, Square, X, Lock, AlertTriangle,
@@ -18,6 +18,7 @@ import { ladenMitCache, schreibenOderMerken, vorgangAusfuehren, zeileAendern, ze
   baustelleSpeichern, artikelSpeichern, positionSpeichern, crewSetzen,
   mitarbeiterSpeichern } from "./daten.js";
 import { HinweisRahmen, useBald } from "./Hinweis.jsx";
+import { DatenZ, useDaten } from "./datenZ.js";
 
 /* ─────────────────────────────────────────────────────────────
    WARO — Prototyp: Material & Aufmaß
@@ -36,8 +37,7 @@ const rechte = (u) => ({ leitung: u.zugang === "Leitung" });
    Alles kommt aus der Datenbank. Row Level Security entscheidet
    serverseitig, was ankommt — die Filter hier sind nur noch
    Darstellung, kein Schutz. */
-export const DatenZ = createContext(null);
-export const useDaten = () => useContext(DatenZ);
+export 
 
 function baueDaten(d) {
   const M = (id) => d.team.find((t) => t.id === id) ?? { name:"—", kurz:"??", rolle:"", zugang:"Monteur" };
@@ -1139,7 +1139,6 @@ export default function App() {
   useEffect(() => { alsLauffaehigMelden(); }, []);
 
   const online = useOnline();
-  useEffect(() => { if (online) nachreichen().catch(() => {}); }, [online, nachreichen]);
 
   /* Beim Start und bei Rueckkehr aus dem Hintergrund nach einer neuen
      Fassung sehen. Im Funkloch still bleiben. */
@@ -1176,6 +1175,12 @@ export default function App() {
       setDaten(d); setAusCache(c); setStand(st);
     }
   }, []);
+
+  /* Sobald wieder Netz da ist, gemerkte Vorgaenge nachreichen. Steht
+     bewusst HINTER der Definition: als const ist nachreichen vorher
+     noch nicht ansprechbar, und die Abhaengigkeitsliste wird schon
+     beim Rendern ausgewertet — die App startete dann gar nicht. */
+  useEffect(() => { if (online) nachreichen().catch(() => {}); }, [online, nachreichen]);
 
   useEffect(() => {
     if (!sitzung) { setDaten(null); return; }
