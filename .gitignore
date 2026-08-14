@@ -20,3 +20,5 @@ android/capacitor-cordova-android-plugins
 *.keystore
 *.jks
 vorschau/
+dist/pakete
+dist/aktuell.json

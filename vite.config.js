@@ -6,8 +6,13 @@ import { VitePWA } from "vite-plugin-pwa";
    Die CI setzt BASE_PATH, damit derselbe Code an beiden Orten läuft. */
 const base = process.env.BASE_PATH || "/";
 
+/* Die App muss ihre eigene Fassung kennen, um sie mit der auf dem
+   Server zu vergleichen. Kommt beim Bauen herein. */
+const fassung = process.env.WARO_FASSUNG || "dev";
+
 export default defineConfig({
   base,
+  define: { __FASSUNG__: JSON.stringify(fassung) },
   plugins: [
     react(),
     VitePWA({

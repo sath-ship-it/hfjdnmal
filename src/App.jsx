@@ -2,13 +2,14 @@ import React, { useState, useEffect, createContext, useContext, useCallback } fr
 import {
   Home, HardHat, Plus, Package, MoreHorizontal, Search, ChevronLeft, ChevronRight,
   Phone, MapPin, Mic, Camera, Clock, Play, Square, X, Lock, AlertTriangle,
-  Building2, Check, Ruler, FileText, Truck, Send, PenLine, Zap
+  Building2, Check, Ruler, FileText, Truck, Send, PenLine, Zap, Download
 } from "lucide-react";
 import Aktualisierung from "./Aktualisierung.jsx";
 import Login from "./Login.jsx";
 import FotoKnopf from "./Foto.jsx";
 import Aufmassblatt from "./Aufmassblatt.jsx";
 import Stammdaten from "./Stammdaten.jsx";
+import { FASSUNG, alsLauffaehigMelden, nachUpdateSehen, updateLaden } from "./appUpdate.js";
 import { supabase } from "./supabase.js";
 import { ladeAlles, anforderungSenden, aufmassSpeichern, bestellen,
   einstempeln, ausstempeln, berichtSpeichern, fotoHochladen, blattSpeichern,
@@ -789,6 +790,7 @@ function Mehr({ u, abmelden, betrieb, neuLaden, stamm }) {
       </div>
       <button className="wr-order" onClick={abmelden}>Abmelden</button>
       <button className="wr-order" onClick={neuLaden}>Daten neu laden</button>
+      <p className="wr-hint" style={{ textAlign:"center" }}>Fassung {FASSUNG}</p>
       {rechte(u).leitung && (
         <>
           <Eyebrow>Stammdaten</Eyebrow>
@@ -1033,10 +1035,26 @@ export default function App() {
   const [erf, setErf] = useState(null);
   const [detail, setDetail] = useState(null);
   const [stamm, setStamm] = useState(false);
+  const [neueFassung, setNeueFassung] = useState(null);   // {version,url}
+  const [ladeStand, setLadeStand] = useState("");          // "" | "laeuft" | "fertig"
   const [jetzt, setJetzt] = useState(() => Date.now());
 
   /* Sitzung beobachten. supabase-js stellt sie aus dem Gerätespeicher
      wieder her, deshalb bleibt man über das Schließen hinaus angemeldet. */
+  /* Dem Nachlade-Modul melden, dass diese Fassung laeuft — sonst haelt
+     es sie fuer kaputt und kehrt zur vorigen zurueck. */
+  useEffect(() => { alsLauffaehigMelden(); }, []);
+
+  /* Beim Start und bei Rueckkehr aus dem Hintergrund nach einer neuen
+     Fassung sehen. Im Funkloch still bleiben. */
+  useEffect(() => {
+    const sehen = () => nachUpdateSehen().then(setNeueFassung).catch(() => {});
+    sehen();
+    const beiRueckkehr = () => { if (document.visibilityState === "visible") sehen(); };
+    document.addEventListener("visibilitychange", beiRueckkehr);
+    return () => document.removeEventListener("visibilitychange", beiRueckkehr);
+  }, []);
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSitzung(data.session ?? null));
     const { data: abo } = supabase.auth.onAuthStateChange((_e, s) => setSitzung(s ?? null));
@@ -1060,6 +1078,13 @@ export default function App() {
     const i = setInterval(() => setJetzt(Date.now()), 1000);
     return () => clearInterval(i);
   }, [daten?.laufend]);
+
+  const updateHolen = async () => {
+    if (!neueFassung || ladeStand === "laeuft") return;
+    setLadeStand("laeuft");
+    try { await updateLaden(neueFassung); setLadeStand("fertig"); }
+    catch (e) { setLadeStand(""); throw e; }
+  };
 
   const abmelden = async () => {
     await supabase.auth.signOut();
@@ -1193,6 +1218,21 @@ export default function App() {
           : <Mehr u={u} abmelden={abmelden} betrieb={daten.betrieb} neuLaden={neuLaden} stamm={() => setStamm(true)} />)}
 
         <Aktualisierung />
+
+        {neueFassung && (
+          <div className="wr-update" role="status">
+            <Download size={16} />
+            <span className="wr-update-t">
+              {ladeStand === "fertig" ? "Bereit — beim nächsten Öffnen aktiv" : `Fassung ${neueFassung.version} verfügbar`}
+            </span>
+            {ladeStand !== "fertig" && (
+              <button className="wr-update-b" onClick={updateHolen} disabled={ladeStand === "laeuft"}>
+                {ladeStand === "laeuft" ? "Lädt …" : "Laden"}
+              </button>
+            )}
+            <button className="wr-update-x" onClick={() => setNeueFassung(null)}>Später</button>
+          </div>
+        )}
 
         <nav className="wr-nav">
           {nav.map(({ k, l, I }) => (
