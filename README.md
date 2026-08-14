@@ -141,6 +141,39 @@ Die Ansatz-Auswertung (`rechne`) versteht `+` und `×` sowie Dezimalkommas und
 arbeitet ohne `eval` — Eingaben von der Baustelle werden nicht als Code
 ausgeführt.
 
+## Backend (in Vorbereitung)
+
+`supabase/migrations/0001_grundgeruest.sql` enthält das Datenmodell und die
+Rechteregeln. Noch nicht angeschlossen — die App liest weiterhin aus den
+Konstanten in `App.jsx`.
+
+Einspielen im Supabase-Dashboard unter *SQL Editor*, oder mit der CLI:
+
+```bash
+supabase db push
+```
+
+Drei Entwurfsentscheidungen, die im Kopf der Datei begründet sind:
+
+**`betrieb_id` in jeder Tabelle**, obwohl es vorerst nur einen Betrieb gibt.
+Nachrüsten hieße später: jede Tabelle migrieren und jede Rechteregel neu
+schreiben, mit echten Kundendaten drin.
+
+**Schlüssel sind UUIDs, die das Gerät vergeben darf.** Ein Monteur im Funkloch
+kann sonst nichts anlegen, weil ihm die Nummer fehlt.
+
+**Gelöscht wird über `geloescht_am`, nicht wirklich.** Sonst kann ein Gerät
+beim Abgleich nicht unterscheiden, ob ein Satz gelöscht wurde oder neu ist.
+
+Kundenname und Ansprechpartner liegen in einer eigenen Tabelle
+(`baustelle_kaufmaennisch`) statt als Spalten. Postgres-Rechte gelten pro
+Rolle, und in Supabase sind alle Angemeldeten dieselbe Rolle — einzelne
+Spalten lassen sich damit nicht pro Zugang wegnehmen.
+
+Die Regeln sind gegen Postgres 16 geprüft: Monteur sieht nur eigene
+Baustellen, keine Kundennamen, kann nicht bestellen; ein fremder Betrieb
+sieht nichts.
+
 ## Stand
 
 Prototyp. Alle Daten sind Konstanten in `App.jsx`, es gibt kein Backend und
