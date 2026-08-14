@@ -11,7 +11,6 @@ import Aufmassblatt from "./Aufmassblatt.jsx";
 import Stammdaten from "./Stammdaten.jsx";
 import { Stunden, Berichte, Fotos } from "./Ansichten.jsx";
 import { useOnline, vorWie, schlangeLesen, schlangeAbarbeiten } from "./offline.js";
-import { FASSUNG, alsLauffaehigMelden, nachUpdateSehen, updateLaden } from "./appUpdate.js";
 import { supabase } from "./supabase.js";
 import { ladenMitCache, schreibenOderMerken, vorgangAusfuehren, zeileAendern, zeileLoeschen, anforderungSenden, aufmassSpeichern, bestellen,
   einstempeln, ausstempeln, berichtSpeichern, fotoHochladen, blattSpeichern,
@@ -106,6 +105,7 @@ function Heute({ u, anf, go, laufend, stempeln, sek, toMat, kannZeit }) {
       <div className="wr-hero">
         <div className="wr-hero-date">Freitag · 14. August 2026 · KW 33</div>
         <h1 className="wr-hero-h">Moin, {u.name.split(" ")[0]}</h1>
+        <div className="wr-task-s" style={{ marginTop:4 }}>{u.zugang}</div>
       </div>
 
       {aktiv && (
@@ -889,7 +889,6 @@ function Mehr({ u, abmelden, betrieb, neuLaden, stamm, zeige }) {
       </div>
       <button className="wr-order" onClick={abmelden}>Abmelden</button>
       <button className="wr-order" onClick={neuLaden}>Daten neu laden</button>
-      <p className="wr-hint" style={{ textAlign:"center" }}>Fassung {FASSUNG}</p>
       {rechte(u).leitung && (
         <>
           <Eyebrow>Erfasstes ansehen</Eyebrow>
@@ -926,7 +925,6 @@ function Mehr({ u, abmelden, betrieb, neuLaden, stamm, zeige }) {
 /* Alle Stile an einer Stelle. Wird sowohl vom Anmeldebildschirm als auch
    von der App selbst gebraucht, deshalb ausserhalb der Komponente. */
 export const STIL = `
-@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
 .wr-root{--oben:env(safe-area-inset-top,0px);--unten:env(safe-area-inset-bottom,0px);--g:${C.ground};--s:${C.surface};--i:${C.ink};--m:${C.mute};--h:${C.hair};--y:${C.signal};
   font-family:'IBM Plex Sans',system-ui,sans-serif;color:var(--i);background:#20262A;min-height:100vh;
   display:flex;align-items:center;justify-content:center;}
@@ -936,7 +934,7 @@ export const STIL = `
 .wr-phone{width:100%;height:100vh;height:100dvh;background:var(--g);display:flex;flex-direction:column;overflow:hidden;}
 @media(min-width:520px){.wr-root{padding:24px}
   .wr-phone{max-width:420px;height:880px;max-height:94vh;border-radius:26px;box-shadow:0 24px 70px rgba(0,0,0,.5)}}
-.wr-demo{flex:none;background:#20262A;padding:calc(8px + var(--oben)) 10px 9px;display:flex;align-items:center;gap:7px;}
+.wr-demo{flex:none;background:#20262A;padding:8px 10px 9px;display:flex;align-items:center;gap:7px;}
 .wr-demo-l{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#7C8A91;flex:none;}
 .wr-demo-b{flex:1;border:1px solid #38424A;background:none;color:#B4C0C6;border-radius:7px;padding:6px 4px;
   font-family:'Archivo',sans-serif;font-weight:600;font-size:11px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -1107,7 +1105,7 @@ export const STIL = `
   #wr-blatt, #wr-blatt *{visibility:visible!important}
   #wr-blatt{position:absolute;left:0;top:0;width:100%;margin:0;border:none;border-radius:0;}
 }
-.wr-phone{padding-bottom:0}
+.wr-phone{padding-bottom:0;padding-top:var(--oben)}
 .wr-netz{flex:none;display:flex;align-items:center;gap:8px;padding:9px 13px;font-size:12px;line-height:1.35;
   background:#2A3238;color:#EEF2F1;}
 .wr-netz svg{flex:none}
@@ -1163,28 +1161,11 @@ export default function App() {
   const [detail, setDetail] = useState(null);
   const [stamm, setStamm] = useState(false);
   const [ansicht, setAnsicht] = useState(null);
-  const [neueFassung, setNeueFassung] = useState(null);   // {version,url}
-  const [ladeStand, setLadeStand] = useState("");          // "" | "laeuft" | "fertig"
-  const [updateFehler, setUpdateFehler] = useState("");
   const [jetzt, setJetzt] = useState(() => Date.now());
 
   /* Sitzung beobachten. supabase-js stellt sie aus dem Gerätespeicher
      wieder her, deshalb bleibt man über das Schließen hinaus angemeldet. */
-  /* Dem Nachlade-Modul melden, dass diese Fassung laeuft — sonst haelt
-     es sie fuer kaputt und kehrt zur vorigen zurueck. */
-  useEffect(() => { alsLauffaehigMelden(); }, []);
-
   const online = useOnline();
-
-  /* Beim Start und bei Rueckkehr aus dem Hintergrund nach einer neuen
-     Fassung sehen. Im Funkloch still bleiben. */
-  useEffect(() => {
-    const sehen = () => nachUpdateSehen().then(setNeueFassung).catch(() => {});
-    sehen();
-    const beiRueckkehr = () => { if (document.visibilityState === "visible") sehen(); };
-    document.addEventListener("visibilitychange", beiRueckkehr);
-    return () => document.removeEventListener("visibilitychange", beiRueckkehr);
-  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSitzung(data.session ?? null));
@@ -1229,17 +1210,6 @@ export default function App() {
     const i = setInterval(() => setJetzt(Date.now()), 1000);
     return () => clearInterval(i);
   }, [daten?.laufend]);
-
-  const updateHolen = async () => {
-    if (!neueFassung || ladeStand === "laeuft") return;
-    setLadeStand("laeuft"); setUpdateFehler("");
-    try { await updateLaden(neueFassung); setLadeStand("fertig"); }
-    catch (e) {
-      /* Frueher verschwand die Meldung ins Nichts und der Balken stand
-         ewig auf "Laedt" — genau das sah aus, als passiere nichts. */
-      setLadeStand(""); setUpdateFehler(e.message || "Laden fehlgeschlagen.");
-    }
-  };
 
   const abmelden = async () => {
     await supabase.auth.signOut();
@@ -1373,12 +1343,6 @@ export default function App() {
       <div className="wr-phone">
        <DatenZ.Provider value={D}>
        <HinweisRahmen>
-        <div className="wr-demo">
-          <span className="wr-demo-l">Angemeldet als</span>
-          <span className="wr-demo-wer">{u.name} · {u.zugang}</span>
-          <button className="wr-demo-ab" onClick={abmelden}>Abmelden</button>
-        </div>
-
         {(!online || ausCache || offen > 0) && (
           <div className={`wr-netz${online ? " wr-netz-warte" : ""}`} role="status">
             {online
@@ -1429,29 +1393,6 @@ export default function App() {
               stamm={() => setStamm(true)} zeige={setAnsicht} />)}
 
         <Aktualisierung />
-
-        {updateFehler && (
-          <div className="wr-netz wr-netz-rot" role="alert">
-            <AlertTriangle size={14} />
-            <span>{updateFehler}</span>
-            <button className="wr-update-x" onClick={() => setUpdateFehler("")}>OK</button>
-          </div>
-        )}
-
-        {neueFassung && (
-          <div className="wr-update" role="status">
-            <Download size={16} />
-            <span className="wr-update-t">
-              {ladeStand === "fertig" ? "Bereit — beim nächsten Öffnen aktiv" : `Fassung ${neueFassung.version} verfügbar`}
-            </span>
-            {ladeStand !== "fertig" && (
-              <button className="wr-update-b" onClick={updateHolen} disabled={ladeStand === "laeuft"}>
-                {ladeStand === "laeuft" ? "Lädt …" : "Laden"}
-              </button>
-            )}
-            <button className="wr-update-x" onClick={() => setNeueFassung(null)}>Später</button>
-          </div>
-        )}
 
         <nav className="wr-nav">
           {nav.map(({ k, l, I }) => (

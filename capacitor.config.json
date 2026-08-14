@@ -6,17 +6,8 @@
     "allowMixedContent": false
   },
   "server": {
-    "androidScheme": "https"
-  },
-  "plugins": {
-    "CapacitorUpdater": {
-      "autoUpdate": false,
-      "updateUrl": "",
-      "statsUrl": "",
-      "channelUrl": "",
-      "autoDeleteFailed": true,
-      "autoDeletePrevious": true,
-      "directUpdate": false
-    }
+    "url": "https://waro-baustelle.pages.dev/",
+    "androidScheme": "https",
+    "cleartext": false
   }
 }

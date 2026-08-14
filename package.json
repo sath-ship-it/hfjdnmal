@@ -6,14 +6,13 @@
   "scripts": {
     "dev": "npm run icons && vite",
     "icons": "node tools/make-icons.mjs",
-    "build": "npm run icons && vite build",
+    "build": "npm run icons && npm run schriften && vite build",
     "preview": "vite preview",
-    "apk": "node tools/build-apk.mjs && npx cap sync android"
+    "schriften": "node tools/schriften.mjs"
   },
   "dependencies": {
     "@capacitor/core": "^8.5.0",
     "@capacitor/status-bar": "^8.0.3",
-    "@capgo/capacitor-updater": "^8.51.7",
     "@supabase/supabase-js": "^2.112.3",
     "lucide-react": "^0.460.0",
     "react": "^19.0.0",
