@@ -15,9 +15,10 @@
 
 do $$
 declare
-  -- ↓↓↓ ANPASSEN: die E-Mail, mit der du dich eben angelegt hast
-  v_email text := 'HIER@DEINE-MAIL.DE';
-  -- ↑↑↑
+  -- Das Anmeldekonto, das die Leitung bekommt. Muss vorher unter
+  -- Authentication → Users angelegt sein, sonst bricht das Skript
+  -- mit einer klaren Meldung ab.
+  v_email text := 'gorlov.daniil@googlemail.com';
   v_auth  uuid;
   b       uuid := '11111111-1111-1111-1111-111111111111';  -- Betrieb
   -- Mitarbeiter
