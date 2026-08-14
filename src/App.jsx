@@ -68,7 +68,7 @@ const Hinweis = ({ children }) => (
 );
 
 /* ── Heute ───────────────────────────────────────────────── */
-function Heute({ u, anf, go, laufend, stempeln, sek, toMat }) {
+function Heute({ u, anf, go, laufend, stempeln, sek, toMat, kannZeit }) {
   const { M, sichtbar } = useDaten();
   const [sendet, setSendet] = useState(false);
   const [fehler, setFehler] = useState("");
@@ -100,17 +100,21 @@ function Heute({ u, anf, go, laufend, stempeln, sek, toMat }) {
             </div>
             <div className="wr-clock-time" style={{ color: laeuft ? C.ink : C.mute }}>{zeit}</div>
           </div>
-          <button className="wr-btn-big" disabled={sendet}
+          <button className="wr-btn-big" disabled={sendet || !kannZeit}
             onClick={async () => {
               setSendet(true); setFehler("");
               try { await stempeln(aktiv.id); }
               catch (e) { setFehler(e.message); }
               finally { setSendet(false); }
             }}
-            style={{ background: laeuft ? C.ink : C.signal, color: laeuft ? "#fff" : C.ink }}>
+            style={{ background: !kannZeit ? "#E4E9E8" : laeuft ? C.ink : C.signal,
+                     color: !kannZeit ? C.mute : laeuft ? "#fff" : C.ink }}>
             {laeuft ? <Square size={17} fill="currentColor" /> : <Play size={17} fill="currentColor" />}
             {sendet ? "Moment …" : laeuft ? "Feierabend" : "Einstempeln"}
           </button>
+          {!kannZeit && <p className="wr-hint" style={{ margin:"8px 0 0" }}>
+            Zeiterfassung ist noch nicht eingerichtet — der Nachtrag 0002 fehlt in der Datenbank.
+          </p>}
           {fehler && <div className="wr-fehler" role="alert"><AlertTriangle size={15} /> {fehler}</div>}
         </div>
       )}
@@ -1149,6 +1153,7 @@ export default function App() {
         </div>
 
         {tab === "heute" && <Heute u={u} anf={daten.anf} laufend={daten.laufend} stempeln={stempeln}
+          kannZeit={daten.koennen.zeit}
           sek={daten.laufend ? Math.max(0, Math.floor((jetzt - new Date(daten.laufend.von).getTime()) / 1000)) : 0}
           go={(id) => { setDetail(id); setTab("bau"); }} toMat={() => setTab("mat")} />}
 

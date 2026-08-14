@@ -36,6 +36,22 @@ export async function ladeAlles() {
     return data ?? [];
   };
 
+  /* Für Tabellen aus späteren Nachträgen. Fehlt eine, fällt nur ihre
+     Funktion aus — nicht die ganze App. Vorher legte eine fehlende
+     Nebentabelle alles lahm, und der Monteur kam nicht mal an seine
+     Baustellen. */
+  const holeWennDa = async (tabelle, spalten = "*") => {
+    const { data, error } = await supabase.from(tabelle).select(spalten);
+    if (error) {
+      if (error.code === "PGRST205" || /schema cache/i.test(error.message || "")) {
+        console.warn(`Tabelle "${tabelle}" fehlt — zugehörige Funktion ist aus.`);
+        return null;
+      }
+      throw new Error(`${tabelle}: ${error.message}`);
+    }
+    return data ?? [];
+  };
+
   const [betriebe, profile, baustellen, kaufm, crew, artikel, anforderungen, positionen, zeilen, zeiten, fotos] =
     await Promise.all([
       hole("betrieb", "id,name"),
@@ -47,8 +63,8 @@ export async function ladeAlles() {
       hole("anforderung"),
       hole("lv_position"),
       hole("aufmass_zeile"),
-      hole("zeit", "id,profil_id,baustelle_id,von,bis"),
-      hole("foto", "id,zeile_id,bericht_id"),
+      holeWennDa("zeit", "id,profil_id,baustelle_id,von,bis"),
+      holeWennDa("foto", "id,zeile_id,bericht_id"),
     ]);
 
   /* Kaufmännisches kommt nur bei der Leitung an — beim Monteur ist die
@@ -108,18 +124,21 @@ export async function ladeAlles() {
       ort: z.ort,
       ansatz: z.ansatz,
       menge: Number(z.menge),
-      foto: fotos.some((f) => f.zeile_id === z.id),
+      foto: (fotos ?? []).some((f) => f.zeile_id === z.id),
       datum: tag(z.erfasst_am),
     }));
 
   /* Die laufende Stempelung, falls es eine gibt. Der Index in der
      Datenbank stellt sicher, dass es höchstens eine je Person ist. */
-  const laufend = zeiten.find((z) => !z.bis && z.profil_id === meinProfil) ?? null;
+  const laufend = (zeiten ?? []).find((z) => !z.bis && z.profil_id === meinProfil) ?? null;
 
   const betriebId = betriebe[0]?.id ?? baustellen[0]?.betrieb_id ?? null;
   if (!betriebId) throw new Error("Kein Betrieb sichtbar — Zugang unvollständig.");
 
-  return { meinProfil, betriebId, betrieb: betriebe[0]?.name ?? "", team, B, ARTIKEL, anf, POS, ZEILEN, laufend };
+    /* Was die Oberfläche ausgrauen muss, weil der Nachtrag fehlt. */
+  const koennen = { zeit: zeiten !== null, fotos: fotos !== null };
+
+  return { meinProfil, betriebId, betrieb: betriebe[0]?.name ?? "", team, B, ARTIKEL, anf, POS, ZEILEN, laufend, koennen };
 }
 
 /* ── Schreiben ───────────────────────────────────────────────
