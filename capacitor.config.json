@@ -6,8 +6,6 @@
     "allowMixedContent": false
   },
   "server": {
-    "url": "https://waro-baustelle.pages.dev/",
-    "androidScheme": "https",
-    "cleartext": false
+    "androidScheme": "https"
   }
 }

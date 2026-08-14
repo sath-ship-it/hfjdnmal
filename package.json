@@ -7,7 +7,8 @@
     "dev": "npm run icons && vite",
     "icons": "node tools/make-icons.mjs",
     "build": "npm run icons && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "apk": "node tools/build-apk.mjs && npx cap sync android"
   },
   "dependencies": {
     "@capacitor/core": "^8.5.0",
