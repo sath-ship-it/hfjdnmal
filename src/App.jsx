@@ -6,8 +6,11 @@ import {
 } from "lucide-react";
 import Aktualisierung from "./Aktualisierung.jsx";
 import Login from "./Login.jsx";
+import FotoKnopf from "./Foto.jsx";
+import Aufmassblatt from "./Aufmassblatt.jsx";
 import { supabase } from "./supabase.js";
-import { ladeAlles, anforderungSenden, aufmassSpeichern, bestellen } from "./daten.js";
+import { ladeAlles, anforderungSenden, aufmassSpeichern, bestellen,
+  einstempeln, ausstempeln, berichtSpeichern, fotoHochladen, blattSpeichern } from "./daten.js";
 import { HinweisRahmen, useBald } from "./Hinweis.jsx";
 
 /* ─────────────────────────────────────────────────────────────
@@ -65,11 +68,17 @@ const Hinweis = ({ children }) => (
 );
 
 /* ── Heute ───────────────────────────────────────────────── */
-function Heute({ u, anf, go, laeuft, setLaeuft, sek, toMat }) {
+function Heute({ u, anf, go, laufend, stempeln, sek, toMat }) {
   const { M, sichtbar } = useDaten();
+  const [sendet, setSendet] = useState(false);
+  const [fehler, setFehler] = useState("");
   const r = rechte(u);
   const mein = sichtbar(u);
-  const aktiv = mein.find((b) => b.heute.includes(u.id)) || mein[0];
+  /* Läuft die Uhr, gilt die Baustelle aus der Stempelung — sonst die,
+     auf der man heute eingeteilt ist. */
+  const aktiv = (laufend && mein.find((b) => b.id === laufend.baustelle_id))
+    || mein.find((b) => b.heute.includes(u.id)) || mein[0];
+  const laeuft = !!laufend;
   const zeit = `${String(Math.floor(sek/3600)).padStart(2,"0")}:${String(Math.floor(sek%3600/60)).padStart(2,"0")}:${String(sek%60).padStart(2,"0")}`;
   const offen = anf.filter((x) => x.status === "Angefordert");
   const dringend = offen.filter((x) => x.dringend);
@@ -91,11 +100,18 @@ function Heute({ u, anf, go, laeuft, setLaeuft, sek, toMat }) {
             </div>
             <div className="wr-clock-time" style={{ color: laeuft ? C.ink : C.mute }}>{zeit}</div>
           </div>
-          <button className="wr-btn-big" onClick={() => setLaeuft(!laeuft)}
+          <button className="wr-btn-big" disabled={sendet}
+            onClick={async () => {
+              setSendet(true); setFehler("");
+              try { await stempeln(aktiv.id); }
+              catch (e) { setFehler(e.message); }
+              finally { setSendet(false); }
+            }}
             style={{ background: laeuft ? C.ink : C.signal, color: laeuft ? "#fff" : C.ink }}>
             {laeuft ? <Square size={17} fill="currentColor" /> : <Play size={17} fill="currentColor" />}
-            {laeuft ? "Feierabend" : "Einstempeln"}
+            {sendet ? "Moment …" : laeuft ? "Feierabend" : "Einstempeln"}
           </button>
+          {fehler && <div className="wr-fehler" role="alert"><AlertTriangle size={15} /> {fehler}</div>}
         </div>
       )}
 
@@ -340,9 +356,9 @@ function Material({ u, anf, bestellenBei, toAnf }) {
 }
 
 /* ── Aufmaß ──────────────────────────────────────────────── */
-function Aufmass({ u, zeilen, speichern, back }) {
-  const bald = useBald();
+function Aufmass({ u, zeilen, speichern, fotoZu, blattSichern, back }) {
   const { POS, sichtbar } = useDaten();
+  const [blatt, setBlatt] = useState(false);
   const mein = sichtbar(u).filter((b) => b.abrechnung === "Einheitspreise");
   const [bs, setBs] = useState(mein[0]?.id);
   const [posId, setPosId] = useState(null);
@@ -350,7 +366,14 @@ function Aufmass({ u, zeilen, speichern, back }) {
   const pos = POS.filter((p) => p.bId === bs);
   const summe = (pId) => zeilen.filter((z) => z.pId === pId).reduce((s, z) => s + z.menge, 0);
 
-  if (posId) return <AufmassPos posId={posId} zeilen={zeilen} speichern={speichern} back={() => setPosId(null)} />;
+  if (posId) return <AufmassPos posId={posId} zeilen={zeilen} speichern={speichern} fotoZu={fotoZu} back={() => setPosId(null)} />;
+
+  const bs_ = mein.find((b) => b.id === bs);
+  if (blatt && bs_) return (
+    <Aufmassblatt baustelle={bs_} positionen={pos} zeilen={zeilen} ersteller={u.name}
+      speichern={(name, blob) => blattSichern(bs_.id, name, blob)}
+      schliessen={() => setBlatt(false)} />
+  );
 
   return (
     <div className="wr-scroll">
@@ -399,11 +422,10 @@ function Aufmass({ u, zeilen, speichern, back }) {
 
       {pos.length > 0 && (
         <>
-          <button className="wr-order" style={{ marginTop:16 }}
-            onClick={() => bald("Der PDF-Export")}>
-            <FileText size={15} /> Aufmaßblatt als PDF erstellen
+          <button className="wr-order" style={{ marginTop:16 }} onClick={() => setBlatt(true)}>
+            <FileText size={15} /> Aufmaßblatt erstellen
           </button>
-          <button className="wr-order" onClick={() => bald("Die Unterschrift")}>
+          <button className="wr-order" onClick={() => setBlatt(true)}>
             <PenLine size={15} /> Vom Kunden unterschreiben lassen
           </button>
         </>
@@ -413,7 +435,7 @@ function Aufmass({ u, zeilen, speichern, back }) {
   );
 }
 
-function AufmassPos({ posId, zeilen, speichern, back }) {
+function AufmassPos({ posId, zeilen, speichern, fotoZu, back }) {
   const bald = useBald();
   const { POS } = useDaten();
   const p = POS.find((x) => x.id === posId);
@@ -425,12 +447,15 @@ function AufmassPos({ posId, zeilen, speichern, back }) {
 
   const [sendet, setSendet] = useState(false);
   const [fehler, setFehler] = useState("");
+  /* Ein Foto gehört zur Zeile. Vor dem Speichern gibt es noch keine —
+     dann hängt es erst einmal nur an der Baustelle. */
+  const [letzteId, setLetzteId] = useState(null);
 
   const sichern = async () => {
     if (!wert || !ort.trim() || sendet) return;
     setSendet(true); setFehler("");
     try {
-      await speichern(posId, ort.trim(), ansatz, wert);
+      setLetzteId(await speichern(posId, ort.trim(), ansatz, wert));
       setOrt(""); setAnsatz("");
     } catch (e) {
       setFehler(e.message || "Speichern fehlgeschlagen.");
@@ -460,8 +485,8 @@ function AufmassPos({ posId, zeilen, speichern, back }) {
           </span>
         </div>
         <div className="wr-two">
-          <button className="wr-order" style={{ margin:0 }}
-            onClick={() => bald("Das Foto")}><Camera size={15} /> Foto</button>
+          <FotoKnopf beschriftung="Foto"
+            hochladen={(d) => fotoZu(p.bId, letzteId, d)} />
           <button className="wr-btn-big" style={{ background: wert && ort ? C.signal : "#E4E9E8",
             color: wert && ort ? C.ink : C.mute, padding:"12px" }} onClick={sichern}
             disabled={sendet}>
@@ -470,6 +495,9 @@ function AufmassPos({ posId, zeilen, speichern, back }) {
         </div>
         {fehler && <div className="wr-fehler" role="alert"><AlertTriangle size={15} /> {fehler}</div>}
         <p className="wr-hint">
+          {letzteId
+            ? "Ein Foto hängt jetzt an der zuletzt gespeicherten Zeile."
+            : "Zuerst die Zeile speichern — dann gehört das Foto zu ihr."}<br />
           Der Ansatz wird mitgespeichert, nicht nur das Ergebnis. Genau den will der Prüfer beim Kunden sehen.
         </p>
       </div>
@@ -524,12 +552,15 @@ function Erfassen({ u, pick }) {
 }
 
 /* ── Tagesbericht (gekürzt) ──────────────────────────────── */
-function Bericht({ u, back }) {
-  const bald = useBald();
+function Bericht({ u, back, speichern, fotoZu }) {
   const { sichtbar } = useDaten();
   const mein = sichtbar(u).filter((b) => b.phase === "In Arbeit" || b.phase === "Beauftragt");
   const [txt, setTxt] = useState("");
   const [rec, setRec] = useState(false);
+  const [bs, setBs] = useState(mein[0]?.id);
+  const [sendet, setSendet] = useState(false);
+  const [fehler, setFehler] = useState("");
+  const [fertig, setFertig] = useState(null);   // id des gespeicherten Berichts
   useEffect(() => {
     if (!rec) return;
     const t = setTimeout(() => {
@@ -548,7 +579,9 @@ function Bericht({ u, back }) {
       <div className="wr-pad">
         <label className="wr-lbl">Baustelle</label>
         <div className="wr-select">
-          <select>{mein.map((b) => <option key={b.id}>{b.name}</option>)}</select>
+          <select value={bs} onChange={(e) => setBs(e.target.value)}>
+            {mein.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
         </div>
         <label className="wr-lbl">Was wurde gemacht</label>
         <div className="wr-ta">
@@ -561,12 +594,20 @@ function Bericht({ u, back }) {
         {rec && <div className="wr-rec">Aufnahme läuft …</div>}
         <label className="wr-lbl">Fotos</label>
         <div className="wr-photos">
-          <button className="wr-photo-add" onClick={() => bald("Das Foto")}><Camera size={20} /><span>Foto</span></button>
+          <FotoKnopf gross hochladen={(d) => fotoZu(bs, null, d, fertig)} />
           <div className="wr-photo" /><div className="wr-photo" />
         </div>
-        <button className="wr-btn-big" style={{ background:C.signal, color:C.ink, marginTop:18 }}
-          onClick={() => bald("Das Abschicken")}>
-          Bericht abschicken
+        {fehler && <div className="wr-fehler" role="alert"><AlertTriangle size={15} /> {fehler}</div>}
+        <button className="wr-btn-big" disabled={sendet || !txt.trim()}
+          style={{ background: txt.trim() && !sendet ? C.signal : "#E4E9E8",
+                   color: txt.trim() && !sendet ? C.ink : C.mute, marginTop:18 }}
+          onClick={async () => {
+            setSendet(true); setFehler("");
+            try { setFertig(await speichern(bs, txt.trim())); setTxt(""); }
+            catch (e) { setFehler(e.message); }
+            finally { setSendet(false); }
+          }}>
+          {sendet ? "Wird gesendet …" : fertig ? "Abgeschickt" : "Bericht abschicken"}
         </button>
         <p className="wr-hint">
           Das Mikro tut nur so: Es blendet nach zwei Sekunden einen festen Text
@@ -608,11 +649,13 @@ function Detail({ u, id, back, zeilen, anf }) {
           href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.adr)}`}>
           <MapPin size={17} /><span>Navi</span>
         </a>
-        {/* Bewusst nicht verdrahtet: In den Testdaten stehen keine echten
-            Rufnummern, und erfundene könnten jemanden anklingeln. */}
-        <button className="wr-quick-b" onClick={() => bald("Anrufen")}>
-          <Phone size={17} /><span>{b.ap.split(" ")[0]}</span>
-        </button>
+        {b.telefon
+          ? <a className="wr-quick-b" href={`tel:${b.telefon.replace(/\s/g, "")}`}>
+              <Phone size={17} /><span>{b.ap.split(" ")[0] || "Anrufen"}</span>
+            </a>
+          : <button className="wr-quick-b" onClick={() => bald("Eine Rufnummer")}>
+              <Phone size={17} /><span>{b.ap.split(" ")[0] || "Anrufen"}</span>
+            </button>}
         <button className="wr-quick-b" onClick={() => setTab("Material")}>
           <Package size={17} /><span>Material</span>
         </button>
@@ -764,7 +807,7 @@ function Mehr({ u, abmelden, betrieb, neuLaden }) {
 
 /* Alle Stile an einer Stelle. Wird sowohl vom Anmeldebildschirm als auch
    von der App selbst gebraucht, deshalb ausserhalb der Komponente. */
-const STIL = `
+export const STIL = `
 @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
 .wr-root{--g:${C.ground};--s:${C.surface};--i:${C.ink};--m:${C.mute};--h:${C.hair};--y:${C.signal};
   font-family:'IBM Plex Sans',system-ui,sans-serif;color:var(--i);background:#20262A;min-height:100vh;
@@ -918,6 +961,29 @@ const STIL = `
 .wr-photo{width:66px;height:66px;border-radius:10px;flex:none;background:linear-gradient(135deg,#D6DEDC,#BFCAC7);}
 .wr-hint{font-size:11.5px;color:var(--m);line-height:1.45;margin:10px 2px 0;}
 .wr-empty{text-align:center;color:var(--m);font-size:13px;line-height:1.6;padding:28px 24px;}
+.wr-blatt{background:#fff;color:#14181B;margin:0 14px;border:1px solid var(--h);border-radius:11px;padding:16px;}
+.wr-blatt-kopf{display:flex;justify-content:space-between;gap:12px;border-bottom:2px solid #14181B;padding-bottom:10px;}
+.wr-blatt-titel{font-family:'Archivo',sans-serif;font-weight:800;font-size:19px;}
+.wr-blatt-klein{font-size:11px;color:#5F6C73;line-height:1.5;}
+.wr-blatt-pos{margin-top:14px;}
+.wr-blatt-poskopf{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;font-weight:600;
+  border-bottom:1px solid #DDE3E2;padding-bottom:5px;}
+.wr-blatt-tab{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:5px;}
+.wr-blatt-tab th{text-align:left;font-weight:500;color:#5F6C73;font-size:10px;text-transform:uppercase;
+  letter-spacing:.06em;padding:3px 4px;}
+.wr-blatt-tab td{padding:3px 4px;border-top:1px solid #EFF2F1;}
+.wr-blatt-nachtrag{margin-top:5px;font-size:11px;color:${C.rot};font-weight:600;}
+.wr-blatt-unten{margin-top:26px;}
+.wr-blatt-linie{border-bottom:1px solid #14181B;height:34px;}
+.wr-unterschrift{position:relative;background:var(--s);border:1.5px dashed #BCC6C4;border-radius:10px;overflow:hidden;}
+.wr-unterschrift canvas{display:block;touch-action:none;}
+.wr-unterschrift-hint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  pointer-events:none;color:var(--m);font-size:13px;}
+@media print{
+  body *{visibility:hidden!important}
+  #wr-blatt, #wr-blatt *{visibility:visible!important}
+  #wr-blatt{position:absolute;left:0;top:0;width:100%;margin:0;border:none;border-radius:0;}
+}
 .wr-mitte{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
   padding:32px 24px;text-align:center;color:var(--m);font-size:14px;}
 .wr-dreht{animation:wrdreh 1s linear infinite}
@@ -957,8 +1023,7 @@ export default function App() {
   const [tab, setTab] = useState("heute");
   const [erf, setErf] = useState(null);
   const [detail, setDetail] = useState(null);
-  const [laeuft, setLaeuft] = useState(true);
-  const [sek, setSek] = useState(13340);
+  const [jetzt, setJetzt] = useState(() => Date.now());
 
   /* Sitzung beobachten. supabase-js stellt sie aus dem Gerätespeicher
      wieder her, deshalb bleibt man über das Schließen hinaus angemeldet. */
@@ -979,7 +1044,12 @@ export default function App() {
     neuLaden();
   }, [sitzung, neuLaden]);
 
-  useEffect(() => { if (!laeuft) return; const i = setInterval(() => setSek((s) => s + 1), 1000); return () => clearInterval(i); }, [laeuft]);
+  /* Tickt nur, solange eine Stempelung läuft. */
+  useEffect(() => {
+    if (!daten?.laufend) return;
+    const i = setInterval(() => setJetzt(Date.now()), 1000);
+    return () => clearInterval(i);
+  }, [daten?.laufend]);
 
   const abmelden = async () => {
     await supabase.auth.signOut();
@@ -1027,6 +1097,38 @@ export default function App() {
     await neuLaden();
   };
 
+  /* Ein- und Ausstempeln über denselben Knopf: läuft eine Stempelung,
+     wird sie beendet, sonst eine neue begonnen. */
+  const stempeln = async (baustelleId) => {
+    if (daten.laufend) await ausstempeln(daten.laufend.id);
+    else await einstempeln(daten.betriebId, baustelleId, daten.meinProfil);
+    await neuLaden();
+  };
+
+  const berichtSchreiben = async (baustelleId, text) => {
+    const id = await berichtSpeichern(daten.betriebId, baustelleId, text, daten.meinProfil);
+    await neuLaden();
+    return id;
+  };
+
+  const blattSichern = async (baustelleId, name, blob) => {
+    const datei = new File([blob], "unterschrift.png", { type: "image/png" });
+    const pfad = await fotoHochladen(datei, {
+      betriebId: daten.betriebId, baustelleId, meinProfil: daten.meinProfil,
+    });
+    await blattSpeichern(daten.betriebId, baustelleId, name, pfad, daten.meinProfil);
+    await neuLaden();
+  };
+
+  const fotoZu = async (baustelleId, zeileId, datei, berichtId) => {
+    await fotoHochladen(datei, {
+      betriebId: daten.betriebId, baustelleId,
+      zeileId: zeileId ?? null, berichtId: berichtId ?? null,
+      meinProfil: daten.meinProfil,
+    });
+    await neuLaden();
+  };
+
   const nav = [
     { k:"heute", l:"Heute", I:Home }, { k:"bau", l:"Baustellen", I:HardHat },
     { k:"erf", l:"Erfassen", I:Plus }, { k:"mat", l:"Material", I:Package },
@@ -1046,7 +1148,8 @@ export default function App() {
           <button className="wr-demo-ab" onClick={abmelden}>Abmelden</button>
         </div>
 
-        {tab === "heute" && <Heute u={u} anf={daten.anf} laeuft={laeuft} setLaeuft={setLaeuft} sek={sek}
+        {tab === "heute" && <Heute u={u} anf={daten.anf} laufend={daten.laufend} stempeln={stempeln}
+          sek={daten.laufend ? Math.max(0, Math.floor((jetzt - new Date(daten.laufend.von).getTime()) / 1000)) : 0}
           go={(id) => { setDetail(id); setTab("bau"); }} toMat={() => setTab("mat")} />}
 
         {tab === "bau" && (detail
@@ -1055,8 +1158,8 @@ export default function App() {
 
         {tab === "erf" && (
           erf === null ? <Erfassen u={u} pick={setErf} />
-          : erf === "bericht" ? <Bericht u={u} back={() => setErf(null)} />
-          : erf === "aufmass" ? <Aufmass u={u} zeilen={daten.ZEILEN} speichern={zeileSpeichern} back={() => setErf(null)} />
+          : erf === "bericht" ? <Bericht u={u} back={() => setErf(null)} speichern={berichtSchreiben} fotoZu={fotoZu} />
+          : erf === "aufmass" ? <Aufmass u={u} zeilen={daten.ZEILEN} speichern={zeileSpeichern} fotoZu={fotoZu} blattSichern={blattSichern} back={() => setErf(null)} />
           : <Anfordern u={u} back={() => setErf(null)} senden={senden} />
         )}
 
