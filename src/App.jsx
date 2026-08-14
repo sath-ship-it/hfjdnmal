@@ -816,8 +816,12 @@ export const STIL = `
 .wr-root{--oben:env(safe-area-inset-top,0px);--unten:env(safe-area-inset-bottom,0px);--g:${C.ground};--s:${C.surface};--i:${C.ink};--m:${C.mute};--h:${C.hair};--y:${C.signal};
   font-family:'IBM Plex Sans',system-ui,sans-serif;color:var(--i);background:#20262A;min-height:100vh;
   display:flex;align-items:center;justify-content:center;}
-.wr-phone{width:100%;max-width:420px;height:100vh;height:100dvh;background:var(--g);display:flex;flex-direction:column;overflow:hidden;}
-@media(min-width:520px){.wr-root{padding:24px}.wr-phone{height:880px;max-height:94vh;border-radius:26px;box-shadow:0 24px 70px rgba(0,0,0,.5)}}
+/* Auf dem Geraet fuellt die App den ganzen Bildschirm. Die Begrenzung
+   auf 420px ist ein Telefonrahmen fuer die Vorschau am Rechner — auf
+   einem breiteren Handy blieben sonst links und rechts Streifen. */
+.wr-phone{width:100%;height:100vh;height:100dvh;background:var(--g);display:flex;flex-direction:column;overflow:hidden;}
+@media(min-width:520px){.wr-root{padding:24px}
+  .wr-phone{max-width:420px;height:880px;max-height:94vh;border-radius:26px;box-shadow:0 24px 70px rgba(0,0,0,.5)}}
 .wr-demo{flex:none;background:#20262A;padding:calc(8px + var(--oben)) 10px 9px;display:flex;align-items:center;gap:7px;}
 .wr-demo-l{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#7C8A91;flex:none;}
 .wr-demo-b{flex:1;border:1px solid #38424A;background:none;color:#B4C0C6;border-radius:7px;padding:6px 4px;
