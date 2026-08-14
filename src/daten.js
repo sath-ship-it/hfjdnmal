@@ -232,7 +232,18 @@ export async function fotoHochladen(datei, { betriebId, baustelleId, zeileId, be
 
   const { error: eUp } = await supabase.storage
     .from("baustelle").upload(pfad, datei, { contentType: datei.type || "image/jpeg" });
-  if (eUp) throw new Error("Hochladen fehlgeschlagen: " + eUp.message);
+  if (eUp) {
+    /* Der haeufigste Fall beim Einrichten: Der Nachtrag 0003, der den
+       Ablageort anlegt, wurde noch nicht eingespielt. Das soll nicht als
+       "Hochladen fehlgeschlagen" durchgehen. */
+    if (/bucket not found|nosuchbucket/i.test(eUp.message || "")) {
+      throw new Error("Der Dateispeicher fehlt — Nachtrag 0003 in Supabase einspielen.");
+    }
+    if (/row-level security|policy/i.test(eUp.message || "")) {
+      throw new Error("Keine Berechtigung zum Ablegen — Regeln aus Nachtrag 0003 fehlen.");
+    }
+    throw new Error("Hochladen fehlgeschlagen: " + eUp.message);
+  }
 
   const { error } = await supabase.from("foto").insert({
     id: crypto.randomUUID(),
