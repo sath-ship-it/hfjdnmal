@@ -32,10 +32,12 @@ create table betrieb (
   erstellt_am timestamptz not null default now()
 );
 
--- Ein Profil hängt an einem Supabase-Anmeldekonto. Es wird von der
--- Leitung per Einladung angelegt — es gibt keine offene Registrierung.
+-- Ein Profil ist der MITARBEITER, nicht der Zugang. Beides ist absichtlich
+-- getrennt: Felix ist Azubi im Betrieb, lange bevor er die App aufs Handy
+-- bekommt. auth_id bleibt leer, bis die Leitung ihm einen Zugang gibt.
 create table profil (
-  id          uuid primary key references auth.users (id) on delete cascade,
+  id          uuid primary key default gen_random_uuid(),
+  auth_id     uuid unique references auth.users (id) on delete set null,
   betrieb_id  uuid not null references betrieb (id) on delete restrict,
   name        text not null,
   kurz        text not null,
@@ -51,12 +53,19 @@ create index on profil (betrieb_id);
 -- Regeln auf profil laufen würden — das ergäbe eine Endlosschleife.
 create or replace function mein_betrieb() returns uuid
   language sql stable security definer set search_path = public as $$
-  select betrieb_id from profil where id = auth.uid()
+  select betrieb_id from profil where auth_id = auth.uid()
+$$;
+
+-- Die eigene Profil-Nummer. Nicht mit auth.uid() verwechseln: das eine ist
+-- der Zugang, das andere der Mitarbeiter.
+create or replace function mein_profil() returns uuid
+  language sql stable security definer set search_path = public as $$
+  select id from profil where auth_id = auth.uid()
 $$;
 
 create or replace function ist_leitung() returns boolean
   language sql stable security definer set search_path = public as $$
-  select coalesce((select zugang = 'Leitung' from profil where id = auth.uid()), false)
+  select coalesce((select zugang = 'Leitung' from profil where auth_id = auth.uid()), false)
 $$;
 
 -- ── Baustellen ────────────────────────────────────────────────
@@ -96,6 +105,9 @@ create table baustelle_crew (
   baustelle_id uuid not null references baustelle (id) on delete cascade,
   profil_id    uuid not null references profil (id) on delete cascade,
   betrieb_id   uuid not null references betrieb (id) on delete restrict,
+  -- Platzhalter, solange es keine Zeiterfassung gibt: speist die
+  -- "heute vor Ort"-Anzeige. Kommt später aus den Stempelzeiten.
+  heute        boolean not null default false,
   primary key (baustelle_id, profil_id)
 );
 create index on baustelle_crew (profil_id);
@@ -224,7 +236,7 @@ create policy baustelle_lesen on baustelle for select
     betrieb_id = mein_betrieb()
     and (ist_leitung() or exists (
       select 1 from baustelle_crew c
-      where c.baustelle_id = baustelle.id and c.profil_id = auth.uid()))
+      where c.baustelle_id = baustelle.id and c.profil_id = mein_profil()))
   );
 create policy baustelle_pflegen on baustelle for all
   using (betrieb_id = mein_betrieb() and ist_leitung())
@@ -284,6 +296,6 @@ create policy aufmass_anlegen on aufmass_zeile for insert
 create policy aufmass_aendern on aufmass_zeile for update
   using (
     betrieb_id = mein_betrieb()
-    and (ist_leitung() or erfasst_von = auth.uid())
+    and (ist_leitung() or erfasst_von = mein_profil())
   )
   with check (betrieb_id = mein_betrieb());
