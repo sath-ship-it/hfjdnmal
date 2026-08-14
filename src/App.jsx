@@ -7,6 +7,7 @@ import {
 import Aktualisierung from "./Aktualisierung.jsx";
 import Login from "./Login.jsx";
 import { useGespeichert, loesche } from "./speicher.js";
+import { HinweisRahmen, useBald } from "./Hinweis.jsx";
 
 /* ─────────────────────────────────────────────────────────────
    WARO — Prototyp: Material & Aufmaß
@@ -204,6 +205,7 @@ function Heute({ u, anf, go, laeuft, setLaeuft, sek, toMat }) {
 
 /* ── Material anfordern (Monteur) ────────────────────────── */
 function Anfordern({ u, back, senden }) {
+  const bald = useBald();
   const mein = sichtbar(u).filter((b) => b.phase === "In Arbeit" || b.phase === "Beauftragt");
   const [bs, setBs] = useState(mein[0]?.id);
   const [q, setQ] = useState("");
@@ -231,11 +233,11 @@ function Anfordern({ u, back, senden }) {
           </select>
         </div>
 
-        <label className="wr-lbl">Artikel suchen oder Barcode scannen</label>
+        <label className="wr-lbl">Artikel suchen</label>
         <div className="wr-search" style={{ margin:0 }}>
           <Search size={16} color={C.mute} />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="z. B. Kabelrinne, BSK, NYM …" />
-          <button className="wr-x" onClick={() => setQ("")}><Camera size={16} /></button>
+          <button className="wr-x" onClick={() => setQ("")} aria-label="Suche leeren"><X size={16} /></button>
         </div>
         {treffer.map((a) => (
           <button key={a.id} className="wr-hit" onClick={() => add(a)}>
@@ -246,6 +248,10 @@ function Anfordern({ u, back, senden }) {
             </div>
           </button>
         ))}
+        <button className="wr-order" style={{ width:"100%", margin:"8px 0 0" }}
+          onClick={() => bald("Der Barcode-Scanner")}>
+          <Camera size={15} /> Barcode scannen
+        </button>
         {q && treffer.length === 0 && (
           <div className="wr-hit" style={{ color:C.mute, fontSize:13 }}>
             Nicht im Stamm. Trotzdem anfordern – Büro legt den Artikel an.
@@ -387,6 +393,7 @@ function Material({ u, anf, setAnf, toAnf }) {
 
 /* ── Aufmaß ──────────────────────────────────────────────── */
 function Aufmass({ u, zeilen, setZeilen, back }) {
+  const bald = useBald();
   const mein = sichtbar(u).filter((b) => b.abrechnung === "Einheitspreise");
   const [bs, setBs] = useState(mein[0]?.id);
   const [posId, setPosId] = useState(null);
@@ -443,10 +450,11 @@ function Aufmass({ u, zeilen, setZeilen, back }) {
 
       {pos.length > 0 && (
         <>
-          <button className="wr-order" style={{ marginTop:16 }}>
+          <button className="wr-order" style={{ marginTop:16 }}
+            onClick={() => bald("Der PDF-Export")}>
             <FileText size={15} /> Aufmaßblatt als PDF erstellen
           </button>
-          <button className="wr-order">
+          <button className="wr-order" onClick={() => bald("Die Unterschrift")}>
             <PenLine size={15} /> Vom Kunden unterschreiben lassen
           </button>
         </>
@@ -457,6 +465,7 @@ function Aufmass({ u, zeilen, setZeilen, back }) {
 }
 
 function AufmassPos({ posId, zeilen, setZeilen, back }) {
+  const bald = useBald();
   const p = POS0.find((x) => x.id === posId);
   const meine = zeilen.filter((z) => z.pId === posId);
   const s = meine.reduce((a, z) => a + z.menge, 0);
@@ -493,7 +502,8 @@ function AufmassPos({ posId, zeilen, setZeilen, back }) {
           </span>
         </div>
         <div className="wr-two">
-          <button className="wr-order" style={{ margin:0 }}><Camera size={15} /> Foto</button>
+          <button className="wr-order" style={{ margin:0 }}
+            onClick={() => bald("Das Foto")}><Camera size={15} /> Foto</button>
           <button className="wr-btn-big" style={{ background: wert && ort ? C.signal : "#E4E9E8",
             color: wert && ort ? C.ink : C.mute, padding:"12px" }} onClick={speichern}>
             Zeile speichern
@@ -555,6 +565,7 @@ function Erfassen({ u, pick }) {
 
 /* ── Tagesbericht (gekürzt) ──────────────────────────────── */
 function Bericht({ u, back }) {
+  const bald = useBald();
   const mein = sichtbar(u).filter((b) => b.phase === "In Arbeit" || b.phase === "Beauftragt");
   const [txt, setTxt] = useState("");
   const [rec, setRec] = useState(false);
@@ -589,12 +600,17 @@ function Bericht({ u, back }) {
         {rec && <div className="wr-rec">Aufnahme läuft …</div>}
         <label className="wr-lbl">Fotos</label>
         <div className="wr-photos">
-          <button className="wr-photo-add"><Camera size={20} /><span>Foto</span></button>
+          <button className="wr-photo-add" onClick={() => bald("Das Foto")}><Camera size={20} /><span>Foto</span></button>
           <div className="wr-photo" /><div className="wr-photo" />
         </div>
-        <button className="wr-btn-big" style={{ background:C.signal, color:C.ink, marginTop:18 }}>
+        <button className="wr-btn-big" style={{ background:C.signal, color:C.ink, marginTop:18 }}
+          onClick={() => bald("Das Abschicken")}>
           Bericht abschicken
         </button>
+        <p className="wr-hint">
+          Das Mikro tut nur so: Es blendet nach zwei Sekunden einen festen Text
+          ein. Echte Spracherkennung kommt später.
+        </p>
       </div>
       <div style={{ height:24 }} />
     </div>
@@ -603,6 +619,7 @@ function Bericht({ u, back }) {
 
 /* ── Baustellen-Detail (mit Aufmaß-Tab) ──────────────────── */
 function Detail({ u, id, back, zeilen, anf }) {
+  const bald = useBald();
   const r = rechte(u);
   const b = B.find((x) => x.id === id);
   const [tab, setTab] = useState("Übersicht");
@@ -624,9 +641,19 @@ function Detail({ u, id, back, zeilen, anf }) {
       </div>
 
       <div className="wr-quick">
-        <a className="wr-quick-b" href="#" onClick={(e) => e.preventDefault()}><MapPin size={17} /><span>Navi</span></a>
-        <a className="wr-quick-b" href="#" onClick={(e) => e.preventDefault()}><Phone size={17} /><span>{b.ap.split(" ")[0]}</span></a>
-        <a className="wr-quick-b" href="#" onClick={(e) => e.preventDefault()}><Package size={17} /><span>Material</span></a>
+        {/* Navi geht wirklich: öffnet die Karten-App mit der Adresse. */}
+        <a className="wr-quick-b" target="_blank" rel="noreferrer"
+          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.adr)}`}>
+          <MapPin size={17} /><span>Navi</span>
+        </a>
+        {/* Bewusst nicht verdrahtet: In den Testdaten stehen keine echten
+            Rufnummern, und erfundene könnten jemanden anklingeln. */}
+        <button className="wr-quick-b" onClick={() => bald("Anrufen")}>
+          <Phone size={17} /><span>{b.ap.split(" ")[0]}</span>
+        </button>
+        <button className="wr-quick-b" onClick={() => setTab("Material")}>
+          <Package size={17} /><span>Material</span>
+        </button>
       </div>
 
       <div className="wr-tabs">
@@ -731,6 +758,46 @@ function Baustellen({ u, go }) {
 }
 
 /* ── Rahmen ──────────────────────────────────────────────── */
+/* ── Mehr ────────────────────────────────────────────────── */
+/* Eigene Komponente, weil sie useBald() braucht: App stellt den
+   Hinweis-Zusammenhang bereit und kann ihn deshalb nicht selbst lesen. */
+function Mehr({ u, abmelden, zuruecksetzen }) {
+  const bald = useBald();
+  return (
+    <div className="wr-scroll">
+      <div className="wr-hero"><h1 className="wr-hero-h">Mehr</h1></div>
+      <Eyebrow>Dein Zugang</Eyebrow>
+      <div className="wr-task">
+        <span className="wr-av" style={{ background:C.ink, color:"#fff" }}>{u.kurz}</span>
+        <div style={{ flex:1 }}>
+          <div className="wr-task-t">{u.name}</div>
+          <div className="wr-task-s">{u.zugang} · {u.rolle}</div>
+        </div>
+      </div>
+      <button className="wr-order" onClick={abmelden}>Abmelden</button>
+      <button className="wr-order" onClick={zuruecksetzen}>Demodaten zurücksetzen</button>
+      {rechte(u).leitung && (
+        <>
+          <Eyebrow>Stammdaten</Eyebrow>
+          {[{ I:Building2, t:"Kunden", s:"22 angelegt" },
+            { I:Package, t:"Artikelstamm", s:`${ARTIKEL.length} Artikel · Datanorm-Import` },
+            { I:Ruler, t:"Leistungsverzeichnisse", s:"GAEB-Import" }].map(({ I, t, s }) => (
+            <button key={t} className="wr-task" style={{ cursor:"pointer" }}
+              onClick={() => bald(`Die Pflege von „${t}“`)}>
+              <span className="wr-icon"><I size={15} /></span>
+              <div style={{ flex:1, textAlign:"left" }}>
+                <div className="wr-task-t">{t}</div><div className="wr-task-s">{s}</div>
+              </div>
+              <ChevronRight size={16} color={C.mute} />
+            </button>
+          ))}
+        </>
+      )}
+      <div style={{ height:24 }} />
+    </div>
+  );
+}
+
 /* Alle Stile an einer Stelle. Wird sowohl vom Anmeldebildschirm als auch
    von der App selbst gebraucht, deshalb ausserhalb der Komponente. */
 const STIL = `
@@ -887,6 +954,13 @@ const STIL = `
 .wr-photo{width:66px;height:66px;border-radius:10px;flex:none;background:linear-gradient(135deg,#D6DEDC,#BFCAC7);}
 .wr-hint{font-size:11.5px;color:var(--m);line-height:1.45;margin:10px 2px 0;}
 .wr-empty{text-align:center;color:var(--m);font-size:13px;line-height:1.6;padding:28px 24px;}
+.wr-toast{position:absolute;left:14px;right:14px;bottom:74px;z-index:20;display:flex;align-items:center;gap:9px;
+  background:var(--i);color:#fff;border-radius:11px;padding:12px 14px;font-size:12.5px;line-height:1.35;
+  box-shadow:0 8px 24px rgba(0,0,0,.28);animation:wrein .18s ease-out;}
+.wr-toast svg{flex:none;color:var(--y)}
+@keyframes wrein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.wr-toast{animation:none}}
+.wr-phone{position:relative;}
 .wr-update{flex:none;display:flex;align-items:center;gap:9px;background:var(--y);color:var(--i);
   padding:11px 13px;border-top:1px solid rgba(0,0,0,.12);}
 .wr-update svg{flex:none}
@@ -927,6 +1001,12 @@ export default function App() {
 
   const abmelden = () => { setUid(null); setTab("heute"); };
 
+  /* Zum Vorführen: alles Erfasste weg, Ausgangsstand zurück. */
+  const zuruecksetzen = () => {
+    loesche("waro.anforderungen", "waro.aufmass");
+    setAnf(ANF0); setZeilen(ZEILEN0);
+  };
+
   /* Nicht angemeldet: nur der Anmeldebildschirm, sonst nichts. */
   if (!u) {
     return (
@@ -952,6 +1032,7 @@ export default function App() {
       <style>{STIL}</style>
 
       <div className="wr-phone">
+       <HinweisRahmen>
         <div className="wr-demo">
           <span className="wr-demo-l">Angemeldet als</span>
           <span className="wr-demo-wer">{u.name} · {u.zugang}</span>
@@ -975,51 +1056,28 @@ export default function App() {
         {tab === "mat" && <Material u={u} anf={anf} setAnf={setAnf}
           toAnf={() => { setTab("erf"); setErf("anford"); }} />}
 
-        {tab === "mehr" && (
-          <div className="wr-scroll">
-            <div className="wr-hero"><h1 className="wr-hero-h">Mehr</h1></div>
-            <Eyebrow>Dein Zugang</Eyebrow>
-            <div className="wr-task">
-              <span className="wr-av" style={{ background:C.ink, color:"#fff" }}>{u.kurz}</span>
-              <div style={{ flex:1 }}>
-                <div className="wr-task-t">{u.name}</div>
-                <div className="wr-task-s">{u.zugang} · {u.rolle}</div>
-              </div>
-            </div>
-            <button className="wr-order" onClick={abmelden}>Abmelden</button>
-            <button className="wr-order" onClick={() => {
-              /* Zum Vorführen: alles Erfasste weg, Ausgangsstand zurück. */
-              loesche("waro.anforderungen", "waro.aufmass");
-              setAnf(ANF0); setZeilen(ZEILEN0);
-            }}>Demodaten zurücksetzen</button>
-            {rechte(u).leitung && (
-              <>
-                <Eyebrow>Stammdaten</Eyebrow>
-                {[{ I:Building2, t:"Kunden", s:"22 angelegt" }, { I:Package, t:"Artikelstamm", s:`${ARTIKEL.length} Artikel · Datanorm-Import` },
-                  { I:Ruler, t:"Leistungsverzeichnisse", s:"GAEB-Import" }].map(({ I, t, s }) => (
-                  <div key={t} className="wr-task">
-                    <span className="wr-icon"><I size={15} /></span>
-                    <div style={{ flex:1 }}><div className="wr-task-t">{t}</div><div className="wr-task-s">{s}</div></div>
-                    <ChevronRight size={16} color={C.mute} />
-                  </div>
-                ))}
-              </>
-            )}
-            <div style={{ height:24 }} />
-          </div>
-        )}
+        {tab === "mehr" && <Mehr u={u} abmelden={abmelden} zuruecksetzen={zuruecksetzen} />}
 
         <Aktualisierung />
 
         <nav className="wr-nav">
           {nav.map(({ k, l, I }) => (
             <button key={k} className={tab === k ? "on" : ""}
-              onClick={() => { setTab(k); if (k !== "bau") setDetail(null); if (k !== "erf") setErf(null); }}>
+              onClick={() => {
+                /* Nochmal auf den schon aktiven Reiter tippen führt zurück
+                   an dessen Anfang — sonst sitzt man in einem
+                   Unterbildschirm fest und der Knopf scheint tot. */
+                if (tab === k) { setDetail(null); setErf(null); }
+                setTab(k);
+                if (k !== "bau") setDetail(null);
+                if (k !== "erf") setErf(null);
+              }}>
               <I size={20} strokeWidth={tab === k ? 2.3 : 1.8} />
               <span>{l}</span>
             </button>
           ))}
         </nav>
+       </HinweisRahmen>
       </div>
     </div>
   );
