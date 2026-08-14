@@ -37,11 +37,11 @@ Es gibt **zwei Dinge, die sich aktualisieren können**, und sie verhalten sich
 völlig verschieden. Das ist der wichtigste Punkt an dieser Einrichtung:
 
 **Der Inhalt — aktualisiert sich selbst.** Die eigentliche App liegt auf
-GitHub Pages. Bei jedem Push baut die CI sie neu und veröffentlicht sie. Der
-Service Worker in der App merkt das, lädt die neue Fassung im Hintergrund und
-zeigt unten einen gelben Hinweis „Neue Fassung verfügbar". Geprüft wird beim
-Start, beim Zurückholen aus dem Hintergrund, stündlich und sobald das Netz
-zurückkommt.
+Cloudflare Pages. Bei jedem Push baut die CI sie neu und veröffentlicht sie.
+Der Service Worker in der App merkt das, lädt die neue Fassung im Hintergrund
+und zeigt unten einen gelben Hinweis „Neue Fassung verfügbar". Geprüft wird
+beim Start, beim Zurückholen aus dem Hintergrund, stündlich und sobald das
+Netz zurückkommt.
 
 Bewusst wird **nie ungefragt neu geladen** (`registerType: "prompt"`). Wer
 gerade ein Aufmaß eintippt, verliert sonst mitten im Satz seine Eingabe. Der
@@ -62,15 +62,30 @@ Ausnahme.
 
 ## Einrichtung (einmalig)
 
-**1. GitHub Pages aktivieren.** Repo → Settings → Pages → Source auf
-**GitHub Actions** stellen. Ohne das schlägt der Deploy-Schritt fehl.
+**1. Cloudflare-Token anlegen.** Im Cloudflare-Dashboard unter *My Profile →
+API Tokens* ein Token mit der Berechtigung **Cloudflare Pages: Edit**
+erzeugen. Die Account-ID steht in der Seitenleiste der Account-Übersicht.
 
-**2. Adresse prüfen.** Die App landet auf
-`https://<benutzer>.github.io/<repo>/`. Genau diese Adresse muss in
-`capacitor.config.json` unter `server.url` stehen. Bei einem anderen Hosting
-dort ändern und die APK neu bauen.
+**2. Als GitHub-Secrets hinterlegen.** Repo → Settings → Secrets and
+variables → Actions:
 
-**3. APK holen.** Nach dem ersten grünen Lauf: Actions → letzter Lauf →
+| Name | Inhalt |
+| --- | --- |
+| `CLOUDFLARE_API_TOKEN` | das erzeugte Token |
+| `CLOUDFLARE_ACCOUNT_ID` | die Account-ID |
+
+Fehlt eines von beiden, überspringt die CI das Veröffentlichen mit einer
+Warnung — sie läuft nicht rot.
+
+**3. Projektname.** Die CI legt das Pages-Projekt beim ersten Lauf selbst an.
+Es heißt `waro-baustelle` (in `.github/workflows/build.yml` unter
+`CF_PROJEKT`), die App landet damit auf `https://waro-baustelle.pages.dev/`.
+
+Wer den Namen ändert, muss ihn **an zwei Stellen** ändern: dort und in
+`capacitor.config.json` unter `server.url`. Sonst zeigt die APK auf eine
+Adresse, unter der nichts veröffentlicht wird.
+
+**4. APK holen.** Nach dem ersten grünen Lauf: Actions → letzter Lauf →
 Artefakte → `waro-apk`. Die Datei auf das Handy kopieren und öffnen. Android
 fragt einmal nach der Erlaubnis, Apps aus unbekannten Quellen zu installieren.
 
