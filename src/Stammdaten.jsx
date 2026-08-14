@@ -77,8 +77,8 @@ function Maske({ titel, unter, zurueck, eintraege, zeile, formular, speichern, g
           <div className="wr-two" style={{ marginTop:14 }}>
             <button className="wr-order" style={{ margin:0 }} onClick={() => setOffen(false)}>Abbrechen</button>
             <button className="wr-btn-big" disabled={!gueltig || sendet}
-              style={{ background: gueltig && !sendet ? "#FFCC00" : "#E4E9E8",
-                       color: gueltig && !sendet ? "#14181B" : "#5F6C73", padding:"12px" }}
+              style={{ background: gueltig && !sendet ? "#FFCC00" : "var(--f)",
+                       color: gueltig && !sendet ? "#14181B" : "var(--m)", padding:"12px" }}
               onClick={ab}>
               {sendet ? "Speichert …" : "Speichern"}
             </button>
@@ -137,8 +137,8 @@ function Baustellen({ zurueck, speichern, crewSetzen }) {
               <span className="wr-av">{m.kurz}</span>
               <span style={{ flex:1, textAlign:"left" }}>{m.name}<br />
                 <span className="wr-task-s">{m.zugang}</span></span>
-              <span className="wr-box" style={drin ? { background:"#14181B", borderColor:"#14181B" } : {}}>
-                {drin && <Check size={12} color="#fff" strokeWidth={3} />}
+              <span className="wr-box" style={drin ? { background:"var(--i)", borderColor:"var(--i)" } : {}}>
+                {drin && <Check size={12} color="var(--ai)" strokeWidth={3} />}
               </span>
             </button>
           );
@@ -304,7 +304,7 @@ export default function Stammdaten({ zurueck, ops, darf }) {
               <div className="wr-bigt">{p.t}</div>
               <div className="wr-task-s">{p.s}</div>
             </div>
-            <ChevronRight size={18} color="#5F6C73" />
+            <ChevronRight size={18} color="var(--m)" />
           </button>
         ))}
       </div>

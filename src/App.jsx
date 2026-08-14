@@ -26,8 +26,14 @@ import { DatenZ, useDaten } from "./datenZ.js";
 const C = { ground:"#EFF2F1", surface:"#FFFFFF", ink:"#14181B", mute:"#5F6C73",
   hair:"#DDE3E2", signal:"#FFCC00", signalDark:"#C79E00", rot:"#C0392B" };
 
-const PHASE = { Anfrage:{c:"#9AA5AA"}, Angebot:{c:"#2F6FD0"}, Beauftragt:{c:"#8A5A2B"},
-  "In Arbeit":{c:"#6FA22A"}, Abgenommen:{c:"#0E7C86"}, Abgerechnet:{c:"#2A3238"} };
+const PHASE = {
+  Anfrage:     { c:"var(--p1)", b:"#7E8B90" },
+  Angebot:     { c:"var(--p2)", b:"#2F6FD0" },
+  Beauftragt:  { c:"var(--p3)", b:"#8A5A2B" },
+  "In Arbeit": { c:"var(--p4)", b:"#5C8A22" },
+  Abgenommen:  { c:"var(--p5)", b:"#0E7C86" },
+  Abgerechnet: { c:"var(--p6)", b:"#2A3238" },
+};
 
 const ST_FARBE = { Angefordert:"#C0392B", Bestellt:"#C79E00", Geliefert:"#2F6FD0", Verbaut:"#6FA22A" };
 /* Was eine Rolle darf. Die Datenbank entscheidet ohnehin selbst — das
@@ -74,7 +80,7 @@ const euro = (n) => n == null ? "—"
 const Stripe = ({ phase, ruht }) => {
   const c = PHASE[phase].c;
   return <span className="wr-stripe" style={ruht
-    ? { background:`repeating-linear-gradient(135deg, ${c} 0 4px, ${C.ground} 4px 8px)` }
+    ? { background:`repeating-linear-gradient(135deg, ${c} 0 4px, var(--s) 4px 8px)` }
     : { background:c }} />;
 };
 const Eyebrow = ({ children, right }) => (
@@ -125,8 +131,8 @@ function Heute({ u, anf, go, laufend, stempeln, sek, toMat, kannZeit }) {
               catch (e) { setFehler(e.message); }
               finally { setSendet(false); }
             }}
-            style={{ background: !kannZeit ? "#E4E9E8" : laeuft ? C.ink : C.signal,
-                     color: !kannZeit ? C.mute : laeuft ? "#fff" : C.ink }}>
+            style={{ background: !kannZeit ? "var(--f)" : laeuft ? "var(--i)" : C.signal,
+                     color: !kannZeit ? "var(--m)" : laeuft ? "var(--ai)" : C.ink }}>
             {laeuft ? <Square size={17} fill="currentColor" /> : <Play size={17} fill="currentColor" />}
             {sendet ? "Moment …" : laeuft ? "Feierabend" : "Einstempeln"}
           </button>
@@ -141,7 +147,7 @@ function Heute({ u, anf, go, laufend, stempeln, sek, toMat, kannZeit }) {
         <>
           <Eyebrow right={offen.length}>Material wartet auf Bestellung</Eyebrow>
           <button className="wr-bigrow" onClick={toMat}>
-            <span className="wr-icon" style={{ background:"#FBE4E1", color:C.rot }}><Package size={16} /></span>
+            <span className="wr-icon" style={{ background:"var(--rotbg)", color:"var(--rot)" }}><Package size={16} /></span>
             <div style={{ flex:1, minWidth:0 }}>
               <div className="wr-task-t">{offen.length} Positionen anfordert</div>
               <div className="wr-task-s">
@@ -260,21 +266,21 @@ function Anfordern({ u, back, senden }) {
         <div className="wr-chips" style={{ padding:0 }}>
           {["Morgen", "Mo 17.08.", "Mi 19.08.", "Nächste Woche"].map((x) => (
             <button key={x} className="wr-chip" onClick={() => setWann(x)}
-              style={wann === x ? { background:C.ink, color:"#fff", borderColor:C.ink } : {}}>{x}</button>
+              style={wann === x ? { background:"var(--i)", color:"var(--ai)", borderColor:"var(--i)" } : {}}>{x}</button>
           ))}
         </div>
 
         <button className="wr-toggle" onClick={() => setDringend(!dringend)}
-          style={dringend ? { borderColor:C.rot, background:"#FBE4E1" } : {}}>
-          <Zap size={16} color={dringend ? C.rot : C.mute} />
+          style={dringend ? { borderColor:"var(--rot)", background:"var(--rotbg)" } : {}}>
+          <Zap size={16} color={dringend ? "var(--rot)" : "var(--m)"} />
           <span style={{ flex:1, textAlign:"left" }}>Dringend – Arbeit steht sonst</span>
-          <span className="wr-box" style={dringend ? { background:C.rot, borderColor:C.rot } : {}}>
-            {dringend && <Check size={12} color="#fff" strokeWidth={3} />}
+          <span className="wr-box" style={dringend ? { background:"var(--rot)", borderColor:"var(--rot)" } : {}}>
+            {dringend && <Check size={12} color="var(--ai)" strokeWidth={3} />}
           </span>
         </button>
 
         <button className="wr-btn-big" disabled={korb.length === 0}
-          style={{ background: korb.length ? C.signal : "#E4E9E8", color: korb.length ? C.ink : C.mute, marginTop:18 }}
+          style={{ background: korb.length ? C.signal : "var(--f)", color: korb.length ? C.ink : "var(--m)", marginTop:18 }}
           onClick={async () => {
             try { await senden(bs, korb, wann, dringend); back(); }
             catch (e) { setFehler(e.message || "Senden fehlgeschlagen."); }
@@ -346,7 +352,7 @@ function Material({ u, anf, bestellenBei, toAnf }) {
       <div className="wr-seg">
         {["Angefordert", "Bestellt", "Geliefert", "Verbaut"].map((s) => (
           <button key={s} onClick={() => setSeg(s)} className="wr-segb"
-            style={seg === s ? { background:"#fff", color:C.ink, boxShadow:"0 1px 3px rgba(0,0,0,.09)" } : {}}>
+            style={seg === s ? { background:"var(--s)", color:"var(--i)", boxShadow:"0 1px 3px rgba(0,0,0,.09)" } : {}}>
             {s}
           </button>
         ))}
@@ -438,7 +444,7 @@ function Aufmass({ u, zeilen, speichern, fotoZu, blattSichern, aendern, loeschen
             </div>
             <div className="wr-task-t" style={{ marginTop:4 }}>{p.txt}</div>
             <div className="wr-bar" style={{ marginTop:9 }}>
-              <span style={{ width:`${pct}%`, background: ueber ? C.rot : PHASE["In Arbeit"].c }} />
+              <span style={{ width:`${pct}%`, background: ueber ? "var(--rot)" : PHASE["In Arbeit"].c }} />
             </div>
             <div className="wr-row" style={{ marginTop:7 }}>
               <span className="wr-mono-s">{zeilen.filter((z) => z.pId === p.id).length} Ansätze</span>
@@ -522,7 +528,7 @@ function Zeile({ z, eh, aendern, loeschen }) {
           <div className="wr-two">
             <button className="wr-order" style={{ margin:0 }} onClick={() => setSicher(false)}>Behalten</button>
             <button className="wr-btn-big" disabled={sendet}
-              style={{ background:C.rot, color:"#fff", padding:"12px" }}
+              style={{ background:"var(--rot)", color:"var(--ai)", padding:"12px" }}
               onClick={() => tun("weg")}>{sendet ? "…" : "Entfernen"}</button>
           </div>
         </>
@@ -532,8 +538,8 @@ function Zeile({ z, eh, aendern, loeschen }) {
           <button className="wr-order" style={{ margin:0, borderColor:C.rot, color:C.rot }}
             onClick={() => setSicher(true)}>Löschen</button>
           <button className="wr-btn-big" disabled={sendet || !wert || !ort.trim()}
-            style={{ background: wert && ort.trim() ? C.signal : "#E4E9E8",
-                     color: wert && ort.trim() ? C.ink : C.mute, padding:"12px" }}
+            style={{ background: wert && ort.trim() ? C.signal : "var(--f)",
+                     color: wert && ort.trim() ? C.ink : "var(--m)", padding:"12px" }}
             onClick={() => tun("speichern")}>{sendet ? "…" : "Sichern"}</button>
         </div>
       )}
@@ -593,8 +599,8 @@ function AufmassPos({ posId, zeilen, speichern, fotoZu, aendern, loeschen, back 
         <div className="wr-two">
           <FotoKnopf beschriftung="Foto"
             hochladen={(d) => fotoZu(p.bId, letzteId, d)} />
-          <button className="wr-btn-big" style={{ background: wert && ort ? C.signal : "#E4E9E8",
-            color: wert && ort ? C.ink : C.mute, padding:"12px" }} onClick={sichern}
+          <button className="wr-btn-big" style={{ background: wert && ort ? C.signal : "var(--f)",
+            color: wert && ort ? C.ink : "var(--m)", padding:"12px" }} onClick={sichern}
             disabled={sendet}>
             {sendet ? "Speichert …" : "Zeile speichern"}
           </button>
@@ -696,8 +702,8 @@ function Bericht({ u, back, speichern, fotoZu }) {
         </div>
         {fehler && <div className="wr-fehler" role="alert"><AlertTriangle size={15} /> {fehler}</div>}
         <button className="wr-btn-big" disabled={sendet || !txt.trim()}
-          style={{ background: txt.trim() && !sendet ? C.signal : "#E4E9E8",
-                   color: txt.trim() && !sendet ? C.ink : C.mute, marginTop:18 }}
+          style={{ background: txt.trim() && !sendet ? C.signal : "var(--f)",
+                   color: txt.trim() && !sendet ? C.ink : "var(--m)", marginTop:18 }}
           onClick={async () => {
             setSendet(true); setFehler("");
             try { setFertig(await speichern(bs, txt.trim())); setTxt(""); }
@@ -730,7 +736,7 @@ function Detail({ u, id, back, zeilen, anf }) {
 
   return (
     <div className="wr-scroll">
-      <div className="wr-dhead" style={{ background:p.c }}>
+      <div className="wr-dhead" style={{ background:p.b }}>
         <button className="wr-back" onClick={back}><ChevronLeft size={18} /> Zurück</button>
         <div className="wr-dnr">{b.nr}</div>
         <h1 className="wr-dtitle">{b.name}</h1>
@@ -813,7 +819,7 @@ function Detail({ u, id, back, zeilen, anf }) {
                       </span>
                     </div>
                     <div className="wr-task-t" style={{ marginTop:4 }}>{x.txt}</div>
-                    <div className="wr-bar"><span style={{ width:`${pct}%`, background: ueber ? C.rot : p.c }} /></div>
+                    <div className="wr-bar"><span style={{ width:`${pct}%`, background: ueber ? "var(--rot)" : p.c }} /></div>
                   </div>
                 );
               })}
@@ -857,7 +863,8 @@ function Baustellen({ u, go }) {
             <div className="wr-row"><span className="wr-card-t">{b.name}</span><span className="wr-mono-s">{b.nr}</span></div>
             <div className="wr-card-s">{rechte(u).leitung ? b.kunde : b.adr}</div>
             <div className="wr-card-meta">
-              <span className="wr-tag" style={{ color:PHASE[b.phase].c, borderColor:PHASE[b.phase].c + "55" }}>
+              <span className="wr-tag" style={{ color:PHASE[b.phase].c,
+                      borderColor:`color-mix(in srgb, ${PHASE[b.phase].c} 40%, transparent)` }}>
                 {b.phase}{b.ruht && " · ruht"}
               </span>
               <span className="wr-mono-s">{b.abrechnung}</span>
@@ -881,7 +888,7 @@ function Mehr({ u, abmelden, betrieb, neuLaden, stamm, zeige }) {
       <div className="wr-hero"><h1 className="wr-hero-h">Mehr</h1></div>
       <Eyebrow right={betrieb}>Dein Zugang</Eyebrow>
       <div className="wr-task">
-        <span className="wr-av" style={{ background:C.ink, color:"#fff" }}>{u.kurz}</span>
+        <span className="wr-av" style={{ background:"var(--i)", color:"var(--ai)" }}>{u.kurz}</span>
         <div style={{ flex:1 }}>
           <div className="wr-task-t">{u.name}</div>
           <div className="wr-task-s">{u.zugang} · {u.rolle}</div>
@@ -925,30 +932,42 @@ function Mehr({ u, abmelden, betrieb, neuLaden, stamm, zeige }) {
 /* Alle Stile an einer Stelle. Wird sowohl vom Anmeldebildschirm als auch
    von der App selbst gebraucht, deshalb ausserhalb der Komponente. */
 export const STIL = `
-.wr-root{--oben:env(safe-area-inset-top,0px);--unten:env(safe-area-inset-bottom,0px);--g:${C.ground};--s:${C.surface};--i:${C.ink};--m:${C.mute};--h:${C.hair};--y:${C.signal};
+/* Farben stehen nur hier. Alles andere greift ueber var() darauf zu,
+   damit die dunkle Fassung weiter unten ein reiner Tausch ist.
+     --g  Grund (Seite)      --s  Flaeche (Karte)   --i  Tinte
+     --m  gedaempfter Text   --h  Haarlinie         --y  Signalgelb
+     --f  Fuellflaeche       --fz  weiche Fuellung  --k  Kontur
+     --ai Text auf Tinte     --rot/--rotbg  Warnung --fokus Fokusrahmen */
+.wr-root{--oben:env(safe-area-inset-top,0px);--unten:env(safe-area-inset-bottom,0px);
+  --g:${C.ground};--s:${C.surface};--i:${C.ink};--m:${C.mute};--h:${C.hair};--y:${C.signal};
+  --f:#E4E9E8;--fz:#E7EBEA;--k:#BCC6C4;--ai:#FFFFFF;
+  --ay:#14181B;--rot:${C.rot};--rotbg:#FBE4E1;--fokus:${C.signalDark};--ph1:#D6DEDC;--ph2:#BFCAC7;
+  --p1:#9AA5AA;--p2:#2F6FD0;--p3:#8A5A2B;--p4:#6FA22A;--p5:#0E7C86;--p6:#2A3238;
+  color-scheme:light;
   font-family:'IBM Plex Sans',system-ui,sans-serif;color:var(--i);background:#20262A;min-height:100vh;
   display:flex;align-items:center;justify-content:center;}
+/* Dunkle Fassung: folgt der Einstellung des Telefons, ohne Schalter in
+   der App. Gelb bleibt gelb — es ist die Signalfarbe, und auf beiden
+   Gruenden gut lesbar. Rot wird heller, sonst verschwindet es. */
+@media(prefers-color-scheme:dark){
+  .wr-root{--g:#12171A;--s:#1B2226;--i:#E8EEEC;--m:#93A0A6;--h:#2B3439;
+    --f:#252E33;--fz:#222A2E;--k:#3B454B;--ai:#12171A;
+    --rot:#FF8172;--rotbg:#3B211D;--fokus:#FFCC00;--ph1:#2A3338;--ph2:#1E262A;
+    --p1:#A9B5BA;--p2:#5D97E8;--p3:#C68F52;--p4:#93C944;--p5:#2FB0BB;--p6:#8C9AA2;
+    color-scheme:dark;background:#0D1114;}
+}
 /* Auf dem Geraet fuellt die App den ganzen Bildschirm. Die Begrenzung
    auf 420px ist ein Telefonrahmen fuer die Vorschau am Rechner — auf
    einem breiteren Handy blieben sonst links und rechts Streifen. */
 .wr-phone{width:100%;height:100vh;height:100dvh;background:var(--g);display:flex;flex-direction:column;overflow:hidden;}
 @media(min-width:520px){.wr-root{padding:24px}
   .wr-phone{max-width:420px;height:880px;max-height:94vh;border-radius:26px;box-shadow:0 24px 70px rgba(0,0,0,.5)}}
-.wr-demo{flex:none;background:#20262A;padding:8px 10px 9px;display:flex;align-items:center;gap:7px;}
-.wr-demo-l{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#7C8A91;flex:none;}
-.wr-demo-b{flex:1;border:1px solid #38424A;background:none;color:#B4C0C6;border-radius:7px;padding:6px 4px;
-  font-family:'Archivo',sans-serif;font-weight:600;font-size:11px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.wr-demo-b.on{background:var(--y);border-color:var(--y);color:#14181B;}
-.wr-demo-wer{flex:1;min-width:0;color:#DCE4E8;font-family:'Archivo',sans-serif;font-weight:600;font-size:11.5px;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.wr-demo-ab{flex:none;border:1px solid #38424A;background:none;color:#B4C0C6;border-radius:7px;padding:5px 10px;
-  font-family:'Archivo',sans-serif;font-weight:600;font-size:11px;cursor:pointer;}
 .wr-anmelde{display:flex;flex-direction:column;}
 .wr-anmelde-kopf{padding:calc(38px + var(--oben)) 18px 4px;}
 .wr-marke{display:flex;align-items:center;justify-content:center;width:56px;height:56px;border-radius:15px;
-  background:var(--y);color:var(--i);font-family:'Archivo',sans-serif;font-weight:800;font-size:30px;line-height:1;}
-.wr-fehler{display:flex;align-items:center;gap:8px;margin-top:10px;padding:10px 12px;background:#FBE4E1;
-  border-radius:9px;font-size:12.5px;color:${C.rot};}
+  background:var(--y);color:var(--ay);font-family:'Archivo',sans-serif;font-weight:800;font-size:30px;line-height:1;}
+.wr-fehler{display:flex;align-items:center;gap:8px;margin-top:10px;padding:10px 12px;background:var(--rotbg);
+  border-radius:9px;font-size:12.5px;color:var(--rot);}
 .wr-fehler svg{flex:none}
 .wr-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
 .wr-scroll::-webkit-scrollbar{width:0}
@@ -957,7 +976,7 @@ export const STIL = `
 .wr-hero-date{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--m);margin-bottom:5px;}
 .wr-sub{font-size:13px;color:var(--m);margin:6px 0 0;line-height:1.4;}
 .wr-sheethead{padding:14px 18px 4px;}
-.wr-back2{background:#E4E9E8;border:none;color:var(--i);border-radius:7px;padding:6px 11px 6px 7px;
+.wr-back2{background:var(--f);border:none;color:var(--i);border-radius:7px;padding:6px 11px 6px 7px;
   font-family:'Archivo',sans-serif;font-weight:600;font-size:12px;display:inline-flex;align-items:center;gap:2px;cursor:pointer;}
 .wr-eyebrow{display:flex;justify-content:space-between;align-items:baseline;padding:22px 18px 8px;
   font-family:'Archivo',sans-serif;font-weight:700;font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--m);}
@@ -985,13 +1004,13 @@ export const STIL = `
 .wr-mono-s{font-size:11.5px;color:var(--m);white-space:nowrap;}
 .wr-mono-b{font-size:14px;font-weight:600;white-space:nowrap;}
 .wr-avatars{display:flex;align-items:center;gap:5px;margin-top:9px;}
-.wr-av{width:26px;height:26px;border-radius:7px;background:#E4E9E8;flex:none;display:flex;align-items:center;
+.wr-av{width:26px;height:26px;border-radius:7px;background:var(--f);flex:none;display:flex;align-items:center;
   justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:600;}
-.wr-icon{width:30px;height:30px;border-radius:8px;background:#E4E9E8;flex:none;display:flex;align-items:center;
+.wr-icon{width:30px;height:30px;border-radius:8px;background:var(--f);flex:none;display:flex;align-items:center;
   justify-content:center;color:var(--m);}
 .wr-search{display:flex;align-items:center;gap:9px;margin:2px 14px 10px;background:var(--s);border:1px solid var(--h);
   border-radius:10px;padding:10px 12px;}
-.wr-search input{flex:1;border:none;outline:none;background:none;font-family:'IBM Plex Sans',sans-serif;font-size:14px;min-width:0;}
+.wr-search input{flex:1;border:none;outline:none;background:none;font-family:'IBM Plex Sans',sans-serif;font-size:14px;min-width:0;color:var(--i);}
 .wr-x{border:none;background:none;color:var(--m);cursor:pointer;padding:0;display:flex;}
 .wr-chips{display:flex;gap:6px;overflow-x:auto;padding:0 14px 10px;}
 .wr-chips::-webkit-scrollbar{height:0}
@@ -1003,10 +1022,10 @@ export const STIL = `
 .wr-task-s{font-size:11.5px;color:var(--m);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .wr-bigrow{display:flex;align-items:center;gap:11px;width:calc(100% - 28px);margin:0 14px 6px;background:var(--s);
   border:1px solid var(--h);border-radius:11px;padding:13px;cursor:pointer;text-align:left;}
-.wr-box{width:19px;height:19px;flex:none;border:1.5px solid #BCC6C4;border-radius:5px;background:none;
+.wr-box{width:19px;height:19px;flex:none;border:1.5px solid var(--k);border-radius:5px;background:none;
   display:flex;align-items:center;justify-content:center;}
 .wr-dot{width:9px;height:9px;border-radius:50%;flex:none;}
-.wr-locked{display:flex;align-items:flex-start;gap:8px;margin:12px 14px 0;padding:11px 13px;background:#E7EBEA;
+.wr-locked{display:flex;align-items:flex-start;gap:8px;margin:12px 14px 0;padding:11px 13px;background:var(--fz);
   border-radius:10px;font-size:12px;line-height:1.45;color:var(--m);}
 .wr-locked svg{flex:none;margin-top:1px}
 .wr-dhead{padding:14px 18px 20px;color:#fff;}
@@ -1026,7 +1045,7 @@ export const STIL = `
   font-family:'Archivo',sans-serif;font-weight:600;font-size:12.5px;color:var(--m);cursor:pointer;}
 .wr-pad{padding:14px 14px 0;}
 .wr-panel{background:var(--s);border:1px solid var(--h);border-radius:11px;padding:13px;margin-bottom:8px;}
-.wr-bar{height:6px;background:#E4E9E8;border-radius:3px;margin-top:9px;overflow:hidden;}
+.wr-bar{height:6px;background:var(--f);border-radius:3px;margin-top:9px;overflow:hidden;}
 .wr-bar span{display:block;height:100%;border-radius:3px;}
 .wr-lbl{font-family:'Archivo',sans-serif;font-weight:700;font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;
   color:var(--m);display:block;margin:18px 0 7px;}
@@ -1037,6 +1056,7 @@ export const STIL = `
   font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--m);flex:none;}
 .wr-select{background:var(--s);border:1px solid var(--h);border-radius:10px;padding:2px 10px;}
 .wr-select select{width:100%;border:none;background:none;outline:none;padding:11px 0;font-family:'IBM Plex Sans',sans-serif;font-size:14px;color:var(--i);}
+.wr-inp::placeholder,.wr-ta textarea::placeholder,.wr-search input::placeholder{color:var(--m);opacity:.75}
 .wr-inp{width:100%;box-sizing:border-box;background:var(--s);border:1px solid var(--h);border-radius:10px;padding:12px;
   font-family:'IBM Plex Sans',sans-serif;font-size:14px;color:var(--i);outline:none;margin-bottom:7px;}
 .wr-ansatz{position:relative;}
@@ -1057,29 +1077,29 @@ export const STIL = `
 .wr-order{display:flex;align-items:center;justify-content:center;gap:7px;width:calc(100% - 28px);margin:8px 14px 0;
   background:var(--s);border:1.5px solid var(--h);border-radius:10px;padding:13px;font-family:'Archivo',sans-serif;
   font-weight:700;font-size:13px;color:var(--i);cursor:pointer;}
-.wr-seg{display:flex;gap:3px;margin:0 14px 12px;background:#E4E9E8;border-radius:10px;padding:3px;}
+.wr-seg{display:flex;gap:3px;margin:0 14px 12px;background:var(--f);border-radius:10px;padding:3px;}
 .wr-segb{flex:1;border:none;background:none;border-radius:8px;padding:8px 2px;font-family:'Archivo',sans-serif;
   font-weight:600;font-size:11px;color:var(--m);cursor:pointer;}
 .wr-poscard{display:block;width:calc(100% - 28px);margin:0 14px 7px;background:var(--s);border:1px solid var(--h);
   border-radius:11px;padding:13px;text-align:left;cursor:pointer;}
 .wr-bigcard{display:flex;align-items:center;gap:13px;width:100%;background:var(--s);border:1px solid var(--h);
   border-radius:12px;padding:16px 14px;margin-bottom:9px;cursor:pointer;}
-.wr-bigicon{width:42px;height:42px;border-radius:11px;background:var(--y);color:var(--i);flex:none;display:flex;
+.wr-bigicon{width:42px;height:42px;border-radius:11px;background:var(--y);color:var(--ay);flex:none;display:flex;
   align-items:center;justify-content:center;}
 .wr-bigt{font-family:'Archivo',sans-serif;font-weight:700;font-size:15.5px;}
 .wr-ta{position:relative;}
 .wr-ta textarea{width:100%;box-sizing:border-box;background:var(--s);border:1px solid var(--h);border-radius:10px;
-  padding:12px 54px 12px 12px;font-family:'IBM Plex Sans',sans-serif;font-size:14px;line-height:1.5;outline:none;resize:none;}
+  padding:12px 54px 12px 12px;font-family:'IBM Plex Sans',sans-serif;font-size:14px;line-height:1.5;outline:none;resize:none;color:var(--i);}
 .wr-mic{position:absolute;right:9px;bottom:9px;width:38px;height:38px;border-radius:10px;border:1px solid var(--h);
   background:var(--g);color:var(--i);display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .wr-rec{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--m);margin-top:7px;animation:wrp 1.1s ease-in-out infinite;}
 @keyframes wrp{0%,100%{opacity:.45}50%{opacity:1}}
 @media(prefers-reduced-motion:reduce){.wr-rec{animation:none}}
 .wr-photos{display:flex;gap:7px;}
-.wr-photo-add{width:66px;height:66px;border-radius:10px;border:1.5px dashed #BCC6C4;background:var(--s);display:flex;
+.wr-photo-add{width:66px;height:66px;border-radius:10px;border:1.5px dashed var(--k);background:var(--s);display:flex;
   flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--m);font-family:'Archivo',sans-serif;
   font-weight:600;font-size:10px;cursor:pointer;flex:none;}
-.wr-photo{width:66px;height:66px;border-radius:10px;flex:none;background:linear-gradient(135deg,#D6DEDC,#BFCAC7);}
+.wr-photo{width:66px;height:66px;border-radius:10px;flex:none;background:linear-gradient(135deg,var(--ph1),var(--ph2));}
 .wr-hint{font-size:11.5px;color:var(--m);line-height:1.45;margin:10px 2px 0;}
 .wr-empty{text-align:center;color:var(--m);font-size:13px;line-height:1.6;padding:28px 24px;}
 .wr-blatt{background:#fff;color:#14181B;margin:0 14px;border:1px solid var(--h);border-radius:11px;padding:16px;}
@@ -1096,10 +1116,10 @@ export const STIL = `
 .wr-blatt-nachtrag{margin-top:5px;font-size:11px;color:${C.rot};font-weight:600;}
 .wr-blatt-unten{margin-top:26px;}
 .wr-blatt-linie{border-bottom:1px solid #14181B;height:34px;}
-.wr-unterschrift{position:relative;background:var(--s);border:1.5px dashed #BCC6C4;border-radius:10px;overflow:hidden;}
+.wr-unterschrift{position:relative;background:#FFFFFF;border:1.5px dashed var(--k);border-radius:10px;overflow:hidden;}
 .wr-unterschrift canvas{display:block;touch-action:none;}
 .wr-unterschrift-hint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-  pointer-events:none;color:var(--m);font-size:13px;}
+  pointer-events:none;color:#8B979D;font-size:13px;}
 @media print{
   body *{visibility:hidden!important}
   #wr-blatt, #wr-blatt *{visibility:visible!important}
@@ -1113,7 +1133,7 @@ export const STIL = `
 .wr-netz-warte{background:#3A4A28;}
 .wr-netz-rot{background:${C.rot};}
 .wr-galerie{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
-.wr-galerie-bild{display:block;aspect-ratio:1;border-radius:9px;overflow:hidden;background:#E4E9E8;
+.wr-galerie-bild{display:block;aspect-ratio:1;border-radius:9px;overflow:hidden;background:var(--f);
   display:flex;align-items:center;justify-content:center;color:var(--m);text-decoration:none;}
 .wr-galerie-bild img{width:100%;height:100%;object-fit:cover;display:block;}
 .wr-mitte{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -1122,22 +1142,22 @@ export const STIL = `
 @keyframes wrdreh{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.wr-dreht{animation:none}}
 .wr-toast{position:absolute;left:14px;right:14px;bottom:74px;z-index:20;display:flex;align-items:center;gap:9px;
-  background:var(--i);color:#fff;border-radius:11px;padding:12px 14px;font-size:12.5px;line-height:1.35;
+  background:var(--i);color:var(--ai);border-radius:11px;padding:12px 14px;font-size:12.5px;line-height:1.35;
   box-shadow:0 8px 24px rgba(0,0,0,.28);animation:wrein .18s ease-out;}
 .wr-toast svg{flex:none;color:var(--y)}
 @keyframes wrein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){.wr-toast{animation:none}}
 .wr-phone{position:relative;}
-.wr-update{flex:none;display:flex;align-items:center;gap:9px;background:var(--y);color:var(--i);
+.wr-update{flex:none;display:flex;align-items:center;gap:9px;background:var(--y);color:var(--ay);
   padding:11px 13px;border-top:1px solid rgba(0,0,0,.12);}
 .wr-update svg{flex:none}
 .wr-update-t{flex:1;min-width:0;font-family:'Archivo',sans-serif;font-weight:700;font-size:12.5px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.wr-update-b{flex:none;border:none;background:var(--i);color:#fff;border-radius:7px;padding:7px 12px;
+.wr-update-b{flex:none;border:none;background:var(--ay);color:#FFFFFF;border-radius:7px;padding:7px 12px;
   font-family:'Archivo',sans-serif;font-weight:700;font-size:12px;cursor:pointer;}
-.wr-update-x{flex:none;border:none;background:none;color:var(--i);opacity:.65;padding:7px 2px;
+.wr-update-x{flex:none;border:none;background:none;color:var(--ay);opacity:.65;padding:7px 2px;
   font-family:'Archivo',sans-serif;font-weight:600;font-size:12px;cursor:pointer;}
-.wr-update-ok{background:#E7EBEA;color:var(--m);}
+.wr-update-ok{background:var(--fz);color:var(--m);}
 .wr-nav{display:flex;background:var(--s);border-top:1px solid var(--h);padding:7px 4px calc(7px + var(--unten));flex:none;}
 .wr-nav button{flex:1;background:none;border:none;padding:5px 2px 3px;display:flex;flex-direction:column;align-items:center;
   gap:3px;cursor:pointer;color:var(--m);position:relative;}
@@ -1146,7 +1166,7 @@ export const STIL = `
 .wr-nav .on::before{content:'';position:absolute;top:-7px;left:50%;transform:translateX(-50%);width:24px;height:2.5px;
   background:var(--y);border-radius:2px;}
 .wr-root button:focus-visible,.wr-root a:focus-visible,.wr-root input:focus-visible,.wr-root select:focus-visible,
-.wr-root textarea:focus-visible{outline:2.5px solid ${C.signalDark};outline-offset:2px;}`;
+.wr-root textarea:focus-visible{outline:2.5px solid var(--fokus);outline-offset:2px;}`;
 
 export default function App() {
   const [sitzung, setSitzung] = useState(undefined);   // undefined = wird noch geprüft

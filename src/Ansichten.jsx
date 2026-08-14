@@ -55,7 +55,7 @@ export function Stunden({ zurueck, u }) {
         <div className="wr-seg">
           {[["ich","Meine"],["alle","Ganzer Betrieb"]].map(([k, l]) => (
             <button key={k} onClick={() => setWer(k)} className="wr-segb"
-              style={wer === k ? { background:"#fff", color:"#14181B", boxShadow:"0 1px 3px rgba(0,0,0,.09)" } : {}}>
+              style={wer === k ? { background:"var(--s)", color:"var(--i)", boxShadow:"0 1px 3px rgba(0,0,0,.09)" } : {}}>
               {l}
             </button>
           ))}

@@ -10,7 +10,19 @@ body {
   padding: 0;
 }
 
+/* Sagt dem Browser, welche Fassung gilt: davon haengen Bildlaufleisten,
+   Auswahlmenues und Datumsfelder ab, die wir nicht selbst zeichnen. */
+html {
+  color-scheme: light dark;
+}
+
 body {
   background: #20262a;
   -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-color-scheme: dark) {
+  body {
+    background: #0d1114;
+  }
 }

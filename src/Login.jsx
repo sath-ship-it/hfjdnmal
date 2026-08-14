@@ -21,9 +21,9 @@ const verstaendlich = (fehler) => {
 /* Die drei Rollen. Nur zum Ausfüllen der Adresse — was jemand sieht,
    entscheidet die Datenbank, nicht diese Liste. */
 const ROLLEN = [
-  { was:"Leitung",    mail:"gorlov.daniil@googlemail.com", sieht:"alles, Zugänge und Mitarbeiter" },
-  { was:"Buchhaltung",mail:"buchhaltung@waro.de",          sieht:"Preise und Kunden, keine Rechtevergabe" },
-  { was:"Monteur",    mail:"monteur@waro.de",              sieht:"eigene Baustellen, keine Preise" },
+  { was:"Leitung",    mail:"leitung@flux.de",     sieht:"alles, Zugänge und Mitarbeiter" },
+  { was:"Buchhaltung",mail:"buchhaltung@flux.de", sieht:"Preise und Kunden, keine Rechtevergabe" },
+  { was:"Monteur",    mail:"monteur@flux.de",     sieht:"eigene Baustellen, keine Preise" },
 ];
 
 export default function Login() {
@@ -73,8 +73,8 @@ export default function Login() {
         )}
 
         <button className="wr-btn-big" type="submit" disabled={laeuft}
-          style={{ background: laeuft ? "#E4E9E8" : "#FFCC00",
-                   color: laeuft ? "#5F6C73" : "#14181B", marginTop: 18 }}>
+          style={{ background: laeuft ? "var(--f)" : "#FFCC00",
+                   color: laeuft ? "var(--m)" : "#14181B", marginTop: 18 }}>
           {laeuft ? <Loader size={17} className="wr-dreht" /> : <LogIn size={17} />}
           {laeuft ? "Wird geprüft …" : "Anmelden"}
         </button>

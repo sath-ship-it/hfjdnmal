@@ -16,7 +16,7 @@ concurrency:
 env:
   # Muss zu server.url in capacitor.config.json passen, sonst zeigt die
   # APK auf eine andere Stelle als die, die hier veröffentlicht wird.
-  CF_PROJEKT: waro-baustelle
+  CF_PROJEKT: flux-baustelle
 
 jobs:
   # ── Die Web-App: der Teil, der sich selbst aktualisiert ──
@@ -40,13 +40,15 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: waro-web
+          name: flux-web
           path: dist
           if-no-files-found: error
 
   # ── Veröffentlichen auf Cloudflare Pages ──
   cloudflare:
-    needs: web
+    # Auch auf die Huelle warten: die APK wird mitveroeffentlicht, damit
+    # /flux.apk immer zur ausgelieferten Fassung passt.
+    needs: [web, apk]
     # Nur der Standard-Zweig geht live. Ohne hinterlegtes Token wird der
     # Schritt übersprungen statt rot zu laufen.
     if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
@@ -55,8 +57,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: waro-web
+          name: flux-web
           path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: flux-apk
+          path: huelle
+      - name: APK zur Webseite legen
+        run: mv huelle/app-debug.apk dist/flux.apk
 
       - name: Zugangsdaten vorhanden?
         id: pruefung
@@ -123,12 +131,12 @@ jobs:
         working-directory: android
         env:
           # Steigende Nummer, sonst verweigert Android das Überinstallieren.
-          WARO_VERSION_CODE: ${{ github.run_number }}
-          WARO_VERSION_NAME: 1.0.${{ github.run_number }}
+          FLUX_VERSION_CODE: ${{ github.run_number }}
+          FLUX_VERSION_NAME: 1.1.${{ github.run_number }}
         run: ./gradlew assembleDebug --no-daemon
 
       - uses: actions/upload-artifact@v4
         with:
-          name: waro-apk
+          name: flux-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

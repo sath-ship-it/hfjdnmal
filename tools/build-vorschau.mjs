@@ -3,12 +3,12 @@
    genügt. Schriften werden eingebettet, der Service Worker entfällt.
 
    Aufruf: node tools/build-vorschau.mjs
-   Ergebnis: vorschau/waro.html                                          */
+   Ergebnis: vorschau/flux.html                                          */
 import { readFileSync, writeFileSync, readdirSync, mkdirSync, rmSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 
 const TMP = "vorschau/.schriften";
-const ZIEL = "vorschau/waro.html";
+const ZIEL = "vorschau/flux.html";
 const SCHRIFTEN =
   "https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800" +
   "&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap";

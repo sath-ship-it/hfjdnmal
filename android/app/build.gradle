@@ -10,8 +10,8 @@ android {
         /* Die CI reicht die Lauf-Nummer durch. Ohne sie (lokaler Bau) bleibt es
            bei 1. Android verweigert die Installation, wenn eine neuere Hülle
            durch eine ältere ersetzt würde — deshalb muss die Zahl steigen. */
-        versionCode System.getenv("WARO_VERSION_CODE") ? System.getenv("WARO_VERSION_CODE").toInteger() : 1
-        versionName System.getenv("WARO_VERSION_NAME") ?: "1.0"
+        versionCode System.getenv("FLUX_VERSION_CODE") ? System.getenv("FLUX_VERSION_CODE").toInteger() : 1
+        versionName System.getenv("FLUX_VERSION_NAME") ?: "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

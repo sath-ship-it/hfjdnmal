@@ -174,8 +174,8 @@ export default function Aufmassblatt({ baustelle, positionen, zeilen, ersteller,
             Drucken / PDF
           </button>
           <button className="wr-btn-big" disabled={!name.trim() || sendet}
-            style={{ background: name.trim() && !sendet ? "#FFCC00" : "#E4E9E8",
-                     color: name.trim() && !sendet ? "#14181B" : "#5F6C73", padding:"12px" }}
+            style={{ background: name.trim() && !sendet ? "#FFCC00" : "var(--f)",
+                     color: name.trim() && !sendet ? "#14181B" : "var(--m)", padding:"12px" }}
             onClick={bestaetigen}>
             {sendet ? "Sichert …" : gesichert ? <><Check size={15} /> Gesichert</> : "Unterschrift sichern"}
           </button>
