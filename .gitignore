@@ -19,3 +19,4 @@ android/capacitor-cordova-android-plugins
 *.apk
 *.keystore
 *.jks
+vorschau/

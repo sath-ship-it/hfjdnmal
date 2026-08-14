@@ -11,6 +11,10 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      /* Für die Einzeldatei-Vorschau (siehe tools/build-vorschau.mjs) hat ein
+         Service Worker keinen Sinn — dort ist er abgeschaltet, und der
+         Update-Hinweis wird dadurch zur Attrappe, die nie erscheint. */
+      disable: process.env.PWA_DISABLE === "1",
       /* "prompt" statt "autoUpdate": es wird NIE ungefragt neu geladen.
          Ein Monteur, der gerade ein Aufmaß eintippt, verliert sonst
          mitten im Satz seine Eingabe. Stattdessen erscheint ein Hinweis,
