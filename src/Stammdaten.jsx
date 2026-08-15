@@ -39,16 +39,37 @@ function Auswahl({ label, wert, setzen, werte }) {
   );
 }
 
-/* Gemeinsamer Rahmen: Liste, Formular, Speichern-Knopf, Fehler. */
-function Maske({ titel, unter, zurueck, eintraege, zeile, formular, speichern, gueltig, leeren }) {
+/* Gemeinsamer Rahmen: Liste, Formular, Speichern-Knopf, Fehler.
+
+   Anlegen UND Aendern. Vorher gab es nur "Neu anlegen", und die Liste
+   darunter war reine Anzeige — eine Baustelle kam damit nie von
+   "Abgenommen" nach "Abgerechnet", ein Artikel ohne Preis blieb fuer
+   immer ohne Preis. Die Datenschicht konnte es die ganze Zeit: jedes
+   *Speichern nimmt eine Nummer entgegen und macht ein upsert. Es
+   fehlte nur der Weg dorthin.
+
+   "laden" fuellt das Formular aus einem vorhandenen Eintrag,
+   "speichern" bekommt dessen Nummer — oder undefined fuer einen
+   neuen. */
+function Maske({ titel, unter, zurueck, eintraege, zeile, formular, speichern, gueltig, leeren, laden }) {
   const [offen, setOffen] = useState(false);
+  const [bearbeitet, setBearbeitet] = useState(null);
   const [sendet, setSendet] = useState(false);
   const [fehler, setFehler] = useState("");
+
+  const schliessen = () => { leeren(); setBearbeitet(null); setOffen(false); setFehler(""); };
+
+  const oeffnen = (e) => {
+    setFehler("");
+    laden(e);
+    setBearbeitet(e.id);
+    setOffen(true);
+  };
 
   const ab = async () => {
     if (!gueltig || sendet) return;
     setSendet(true); setFehler("");
-    try { await speichern(); leeren(); setOffen(false); }
+    try { await speichern(bearbeitet ?? undefined); schliessen(); }
     catch (e) { setFehler(e.message || "Speichern fehlgeschlagen."); }
     finally { setSendet(false); }
   };
@@ -64,7 +85,7 @@ function Maske({ titel, unter, zurueck, eintraege, zeile, formular, speichern, g
       {!offen && (
         <div className="wr-pad">
           <button className="wr-btn-big" style={{ background:"#FFCC00", color:"#14181B" }}
-            onClick={() => { leeren(); setOffen(true); }}>
+            onClick={() => { leeren(); setBearbeitet(null); setOffen(true); }}>
             <Plus size={17} /> Neu anlegen
           </button>
         </div>
@@ -72,22 +93,30 @@ function Maske({ titel, unter, zurueck, eintraege, zeile, formular, speichern, g
 
       {offen && (
         <div className="wr-pad">
+          {bearbeitet && <div className="wr-eyebrow" style={{ padding:"0 0 8px" }}>
+            <span>Wird geändert</span></div>}
           {formular}
           {fehler && <div className="wr-fehler" role="alert"><AlertTriangle size={15} /> {fehler}</div>}
           <div className="wr-two" style={{ marginTop:14 }}>
-            <button className="wr-order" style={{ margin:0 }} onClick={() => setOffen(false)}>Abbrechen</button>
+            <button className="wr-order" style={{ margin:0 }} onClick={schliessen}>Abbrechen</button>
             <button className="wr-btn-big" disabled={!gueltig || sendet}
               style={{ background: gueltig && !sendet ? "#FFCC00" : "var(--f)",
                        color: gueltig && !sendet ? "#14181B" : "var(--m)", padding:"12px" }}
               onClick={ab}>
-              {sendet ? "Speichert …" : "Speichern"}
+              {sendet ? "Speichert …" : bearbeitet ? "Änderung sichern" : "Speichern"}
             </button>
           </div>
         </div>
       )}
 
       <div className="wr-eyebrow"><span>Vorhanden</span><span className="wr-eyebrow-r">{eintraege.length}</span></div>
-      {eintraege.map(zeile)}
+      {eintraege.map((e) => (
+        <button key={e.id} className="wr-task" style={{ width:"100%", cursor:"pointer", textAlign:"left" }}
+          onClick={() => oeffnen(e)}>
+          {zeile(e)}
+          <ChevronRight size={16} color="var(--m)" />
+        </button>
+      ))}
       {eintraege.length === 0 && <div className="wr-empty">Noch nichts angelegt.</div>}
       <div style={{ height:24 }} />
     </div>
@@ -103,19 +132,22 @@ function Baustellen({ zurueck, speichern, crewSetzen }) {
   const s = (k) => (e) => setF({ ...f, [k]: e.target.value });
 
   return (
-    <Maske titel="Baustellen" unter="Neue Baustelle anlegen. Zugeteilte Monteure sehen sie sofort."
+    <Maske titel="Baustellen" unter="Anlegen oder antippen zum Ändern. Zugeteilte Monteure sehen sie sofort."
       zurueck={zurueck} eintraege={B} leeren={() => setF(leer)}
       gueltig={!!f.nr.trim() && !!f.name.trim()}
-      speichern={async () => {
-        const id = await speichern(f);
-        if (f.crew.length) await crewSetzen(id, f.crew);
+      laden={(b) => setF({ nr:b.nr, name:b.name, adr:b.adr ?? "", phase:b.phase,
+                           abrechnung:b.abrechnung, kunde:b.kunde ?? "", ap:b.ap ?? "",
+                           telefon:b.telefon ?? "", crew:b.crew ?? [] })}
+      speichern={async (id) => {
+        const neu = await speichern(f, id);
+        /* Beim Ändern immer setzen, auch auf leer — sonst liesse sich
+           niemand mehr von einer Baustelle abziehen. */
+        if (id || f.crew.length) await crewSetzen(neu ?? id, f.crew);
       }}
       zeile={(b) => (
-        <div key={b.id} className="wr-task">
-          <div style={{ flex:1, minWidth:0 }}>
-            <div className="wr-task-t">{b.name}</div>
-            <div className="wr-task-s">{b.nr} · {b.phase} · {b.abrechnung}</div>
-          </div>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div className="wr-task-t">{b.name}</div>
+          <div className="wr-task-s">{b.nr} · {b.phase} · {b.abrechnung}</div>
         </div>
       )}
       formular={<>
@@ -159,17 +191,18 @@ function Artikel({ zurueck, speichern, darfPreise }) {
   const leer = { txt:"", eh:"St", lief:"", ek:"", vk:"" };
   const [f, setF] = useState(leer);
   return (
-    <Maske titel="Artikelstamm" unter="Was angefordert werden kann."
+    <Maske titel="Artikelstamm" unter="Was angefordert werden kann. Antippen zum Ändern — auch für Preise."
       zurueck={zurueck} eintraege={ARTIKEL} leeren={() => setF(leer)}
-      gueltig={!!f.txt.trim()} speichern={() => speichern(f)}
+      gueltig={!!f.txt.trim()} speichern={(id) => speichern(f, id)}
+      laden={(a) => setF({ txt:a.txt, eh:a.eh, lief:a.lief === "—" ? "" : (a.lief ?? ""),
+                           ek: a.ek == null ? "" : String(a.ek).replace(".", ","),
+                           vk: a.vk == null ? "" : String(a.vk).replace(".", ",") })}
       zeile={(a) => (
-        <div key={a.id} className="wr-task">
-          <div style={{ flex:1, minWidth:0 }}>
-            <div className="wr-task-t">{a.txt}</div>
-            <div className="wr-task-s">
-              {a.lief} · {a.eh}
-              {darfPreise && a.ek != null ? ` · EK ${euro(a.ek)} · VK ${euro(a.vk)}` : ""}
-            </div>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div className="wr-task-t">{a.txt}</div>
+          <div className="wr-task-s">
+            {a.lief} · {a.eh}
+            {darfPreise && a.ek != null ? ` · EK ${euro(a.ek)} · VK ${euro(a.vk)}` : ""}
           </div>
         </div>
       )}
@@ -199,21 +232,22 @@ function Positionen({ zurueck, speichern, darfPreise }) {
   const meine = POS.filter((p) => p.bId === bs);
 
   return (
-    <Maske titel="Leistungsverzeichnis" unter="Positionen, gegen die aufgemessen wird."
+    <Maske titel="Leistungsverzeichnis" unter="Positionen, gegen die aufgemessen wird. Antippen zum Ändern."
       zurueck={zurueck} eintraege={meine} leeren={() => setF(leer)}
       gueltig={!!f.nr.trim() && !!f.txt.trim() && !!bs}
-      speichern={() => speichern(bs, f)}
-      zeile={(p) => (
-        <div key={p.id} className="wr-task">
-          <span className="wr-mono-s" style={{ width:44 }}>{p.nr}</span>
-          <div style={{ flex:1, minWidth:0 }}>
-            <div className="wr-task-t">{p.txt}</div>
-            <div className="wr-task-s">
-              {p.lv} {p.eh} im LV{darfPreise && p.ep != null ? ` · ${euro(p.ep)} / ${p.eh}` : ""}
-            </div>
+      speichern={(id) => speichern(bs, f, id)}
+      laden={(p) => { setBs(p.bId); setF({ nr:p.nr, txt:p.txt, eh:p.eh,
+                        lv: String(p.lv).replace(".", ","),
+                        ep: p.ep == null ? "" : String(p.ep).replace(".", ",") }); }}
+      zeile={(p) => (<>
+        <span className="wr-mono-s" style={{ width:44 }}>{p.nr}</span>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div className="wr-task-t">{p.txt}</div>
+          <div className="wr-task-s">
+            {p.lv} {p.eh} im LV{darfPreise && p.ep != null ? ` · ${euro(p.ep)} / ${p.eh}` : ""}
           </div>
         </div>
-      )}
+      </>)}
       formular={<>
         <Auswahl label="Baustelle" wert={bs} setzen={setBs} werte={mitLV} />
         <Feld label="Position" value={f.nr} onChange={(e) => setF({ ...f, nr:e.target.value })}
@@ -243,18 +277,17 @@ function Mitarbeiter({ zurueck, speichern }) {
   const leer = { name:"", kurz:"", rolle:"", zugang:"Monteur" };
   const [f, setF] = useState(leer);
   return (
-    <Maske titel="Mitarbeiter" unter="Wer im Betrieb ist — ein Zugang kommt getrennt dazu."
+    <Maske titel="Mitarbeiter" unter="Wer im Betrieb ist. Antippen zum Ändern; ein Zugang kommt getrennt dazu."
       zurueck={zurueck} eintraege={team} leeren={() => setF(leer)}
-      gueltig={!!f.name.trim() && !!f.kurz.trim()} speichern={() => speichern(f)}
-      zeile={(m) => (
-        <div key={m.id} className="wr-task">
-          <span className="wr-av">{m.kurz}</span>
-          <div style={{ flex:1, minWidth:0 }}>
-            <div className="wr-task-t">{m.name}</div>
-            <div className="wr-task-s">{m.zugang}{m.rolle ? ` · ${m.rolle}` : ""}</div>
-          </div>
+      gueltig={!!f.name.trim() && !!f.kurz.trim()} speichern={(id) => speichern(f, id)}
+      laden={(m) => setF({ name:m.name, kurz:m.kurz, rolle:m.rolle ?? "", zugang:m.zugang })}
+      zeile={(m) => (<>
+        <span className="wr-av">{m.kurz}</span>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div className="wr-task-t">{m.name}</div>
+          <div className="wr-task-s">{m.zugang}{m.rolle ? ` · ${m.rolle}` : ""}</div>
         </div>
-      )}
+      </>)}
       formular={<>
         <Feld label="Name" value={f.name} onChange={(e) => setF({ ...f, name:e.target.value })} />
         <Feld label="Kürzel" value={f.kurz} onChange={(e) => setF({ ...f, kurz:e.target.value })}

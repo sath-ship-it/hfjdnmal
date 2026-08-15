@@ -75,12 +75,27 @@ function Unterschrift({ leinwand }) {
   );
 }
 
+/* Der Android-Programmteil, in dem die App laeuft (WebView), bringt
+   keinen Druckdialog mit — window.print() bleibt dort wirkungslos.
+   Wir rufen es trotzdem auf (falls doch) und blenden danach den Weg
+   ueber den Browser ein, wo derselbe Bildschirm drucken kann. Im
+   Browser selbst erscheint der Hinweis gar nicht. */
+const NATIV = !!globalThis.Capacitor?.isNativePlatform?.();
+const ADRESSE = globalThis.location?.origin ?? "https://flux-baustelle.pages.dev";
+
 export default function Aufmassblatt({ baustelle, positionen, zeilen, ersteller, speichern, schliessen }) {
   const leinwand = useRef(null);
   const [name, setName] = useState("");
   const [sendet, setSendet] = useState(false);
   const [fehler, setFehler] = useState("");
   const [gesichert, setGesichert] = useState(false);
+  const [gedruckt, setGedruckt] = useState(false);
+  const [kopiert, setKopiert] = useState(false);
+
+  const drucken = () => {
+    setGedruckt(true);
+    try { window.print(); } catch { /* dann greift der Hinweis darunter */ }
+  };
 
   const summe = (pId) => zeilen.filter((z) => z.pId === pId).reduce((s, z) => s + z.menge, 0);
   const heute = new Date().toLocaleDateString("de-DE");
@@ -170,7 +185,7 @@ export default function Aufmassblatt({ baustelle, positionen, zeilen, ersteller,
         {fehler && <div className="wr-fehler" role="alert"><AlertTriangle size={15} /> {fehler}</div>}
 
         <div className="wr-two" style={{ marginTop:12 }}>
-          <button className="wr-order" style={{ margin:0 }} onClick={() => window.print()}>
+          <button className="wr-order" style={{ margin:0 }} onClick={drucken}>
             Drucken / PDF
           </button>
           <button className="wr-btn-big" disabled={!name.trim() || sendet}
@@ -180,6 +195,23 @@ export default function Aufmassblatt({ baustelle, positionen, zeilen, ersteller,
             {sendet ? "Sichert …" : gesichert ? <><Check size={15} /> Gesichert</> : "Unterschrift sichern"}
           </button>
         </div>
+        {gedruckt && NATIV && (
+          <div className="wr-locked" style={{ margin:"12px 0 0" }}>
+            <AlertTriangle size={15} />
+            <span>
+              Kein Druckdialog erschienen? Der Android-Programmteil, in dem
+              die App läuft, bringt keinen mit. Dieselbe Seite im Browser
+              geöffnet kann es: <b>{ADRESSE.replace("https://", "")}</b>
+              {kopiert ? " — Adresse kopiert." : ""}
+              <button className="wr-back2" style={{ marginTop:8, display:"block" }}
+                onClick={async () => {
+                  try { await navigator.clipboard.writeText(ADRESSE); setKopiert(true); } catch { /* dann eben abtippen */ }
+                }}>
+                Adresse kopieren
+              </button>
+            </span>
+          </div>
+        )}
         <p className="wr-hint">
           „Drucken" öffnet den Druckdialog des Geräts — dort gibt es
           „Als PDF speichern". Die Unterschrift wird getrennt davon

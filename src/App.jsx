@@ -321,11 +321,26 @@ function Anfordern({ u, back, senden }) {
   );
 }
 
+/* Vorgabe fuer den Liefertermin: der naechste Werktag. Samstag und
+   Sonntag liefert kein Grosshaendler. */
+const naechsterWerktag = () => {
+  const d = new Date();
+  do { d.setDate(d.getDate() + 1); } while (d.getDay() === 0 || d.getDay() === 6);
+  return d.toISOString().slice(0, 10);
+};
+/* "2026-08-18" -> "Di 18.08." — so steht es auf der Karte. */
+const terminText = (iso) => {
+  const d = new Date(`${iso}T12:00:00`);
+  if (isNaN(d)) return iso;
+  return d.toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit" });
+};
+
 /* ── Material-Übersicht ──────────────────────────────────── */
 function Material({ u, anf, bestellenBei, toAnf }) {
   const { M, A, B, sichtbar } = useDaten();
   const r = rechte(u);
   const [seg, setSeg] = useState("Angefordert");
+  const [termin, setTermin] = useState(naechsterWerktag);
   const mein = sichtbar(u).map((b) => b.id);
   const pool = anf.filter((x) => r.leitung || mein.includes(x.bId));
   const liste = pool.filter((x) => x.status === seg);
@@ -338,7 +353,7 @@ function Material({ u, anf, bestellenBei, toAnf }) {
     setSendet(lief);
     try {
       await bestellenBei(anf.filter((x) => x.status === "Angefordert" && A(x.aId).lief === lief)
-        .map((x) => x.id));
+        .map((x) => x.id), terminText(termin));
     } finally { setSendet(""); }
   };
 
@@ -382,6 +397,25 @@ function Material({ u, anf, bestellenBei, toAnf }) {
       </div>
 
       {liste.length === 0 && <div className="wr-empty">Nichts in „{seg}“.</div>}
+
+      {/* Ohne Netz oder ohne Recht: sagen warum, statt einen toten
+          Knopf zu zeigen. Bestellen darf laut Datenbank nur die
+          Leitung. */}
+      {!r.leitung && r.preise && seg === "Angefordert" && liste.length > 0 && (
+        <div className="wr-locked">
+          <Lock size={15} />
+          <span>Bestellen löst die Leitung aus. Hier siehst du, was angefordert wurde.</span>
+        </div>
+      )}
+
+      {r.leitung && seg === "Angefordert" && liste.length > 0 && (
+        <div className="wr-pad" style={{ paddingBottom:0 }}>
+          <label className="wr-lbl" htmlFor="termin">Liefertermin für diese Bestellung</label>
+          <input id="termin" className="wr-inp" type="date" value={termin}
+            min={new Date().toISOString().slice(0, 10)}
+            onChange={(e) => setTermin(e.target.value)} />
+        </div>
+      )}
 
       {r.leitung && seg === "Angefordert"
         ? lieferanten.map((lief) => {
@@ -1094,6 +1128,8 @@ export const STIL = `
 .wr-erg{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-family:'IBM Plex Mono',monospace;
   font-size:13px;font-weight:600;color:var(--m);}
 .wr-two{display:grid;grid-template-columns:1fr 1.4fr;gap:7px;margin-top:7px;}
+/* Zwei gleich wichtige Felder nebeneinander, etwa Von und Bis. */
+.wr-two-gleich{grid-template-columns:1fr 1fr;}
 .wr-drei{display:grid;grid-template-columns:1fr 1fr 1.2fr;gap:6px;margin-top:9px;}
 .wr-hit{display:flex;align-items:center;gap:11px;width:100%;background:var(--s);border:1px solid var(--h);
   border-radius:10px;padding:11px 13px;margin-top:6px;cursor:pointer;text-align:left;}
@@ -1347,8 +1383,8 @@ export default function App() {
       aufmassSpeichern(n.betriebId, posId, ort, ansatz, menge, n.profil, id));
     return id;
   };
-  const bestellenBei = async (ids) => {
-    await bestellen(ids, "Di 18.08.");
+  const bestellenBei = async (ids, liefertermin) => {
+    await bestellen(ids, liefertermin);
     await neuLaden();
   };
 
@@ -1392,12 +1428,13 @@ export default function App() {
   /* Stammdaten: nach jedem Schreiben neu laden, damit die Listen und
      alle anderen Bildschirme sofort stimmen. */
   const nachher = (fn) => async (...a) => { const r = await fn(...a); await neuLaden(); return r; };
+  /* Die id reicht durch: ist sie da, wird geaendert statt angelegt. */
   const stammOps = {
-    baustelle:   nachher((f) => baustelleSpeichern(daten.betriebId, f)),
+    baustelle:   nachher((f, id) => baustelleSpeichern(daten.betriebId, f, id)),
     crew:        nachher((bId, ids) => crewSetzen(daten.betriebId, bId, ids)),
-    artikel:     nachher((f) => artikelSpeichern(daten.betriebId, f)),
-    position:    nachher((bId, f) => positionSpeichern(daten.betriebId, bId, f)),
-    mitarbeiter: nachher((f) => mitarbeiterSpeichern(daten.betriebId, f)),
+    artikel:     nachher((f, id) => artikelSpeichern(daten.betriebId, f, id)),
+    position:    nachher((bId, f, id) => positionSpeichern(daten.betriebId, bId, f, id)),
+    mitarbeiter: nachher((f, id) => mitarbeiterSpeichern(daten.betriebId, f, id)),
   };
 
   const fotoZu = async (baustelleId, zeileId, datei, berichtId) => {
@@ -1461,7 +1498,7 @@ export default function App() {
           ? <Detail u={u} id={detail} back={() => setDetail(null)} zeilen={daten.ZEILEN} anf={daten.anf} />
           : <Abrechnung u={u} oeffne={(id) => setDetail(id)} />)}
 
-        {aktiv === "stunden" && <Stunden u={u} />}
+        {aktiv === "stunden" && <Stunden u={u} neuLaden={neuLaden} />}
 
         {aktiv === "bau" && (detail
           ? <Detail u={u} id={detail} back={() => setDetail(null)} zeilen={daten.ZEILEN} anf={daten.anf} />
@@ -1480,7 +1517,7 @@ export default function App() {
 
         {aktiv === "mehr" && (
           stamm ? <Stammdaten zurueck={() => setStamm(false)} ops={stammOps} darf={rechte(u)} />
-          : ansicht === "stunden"  ? <Stunden  u={u} zurueck={() => setAnsicht(null)} />
+          : ansicht === "stunden"  ? <Stunden  u={u} zurueck={() => setAnsicht(null)} neuLaden={neuLaden} />
           : ansicht === "berichte" ? <Berichte zurueck={() => setAnsicht(null)} />
           : ansicht === "fotos"    ? <Fotos    zurueck={() => setAnsicht(null)} />
           : <Mehr u={u} abmelden={abmelden} betrieb={daten.betrieb} neuLaden={neuLaden}

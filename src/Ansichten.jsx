@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { ChevronLeft, Clock, FileText, Camera, AlertTriangle } from "lucide-react";
+import { ChevronLeft, Clock, FileText, Camera, AlertTriangle, Trash2, Check } from "lucide-react";
 import { useDaten } from "./datenZ.js";
-import { fotoAdressen } from "./daten.js";
+import { fotoAdressen, zeitAendern, zeitLoeschen } from "./daten.js";
 
 /* ─────────────────────────────────────────────────────────────
    Lesen, was erfasst wurde.
@@ -24,8 +24,87 @@ const wochenStart = (d = new Date()) => {
   return t;
 };
 
+/* Eine Stempelung berichtigen. Klappt unter dem Eintrag auf, wie die
+   Korrektur einer Aufmaß-Zeile — derselbe Griff für dieselbe Sache.
+
+   Bearbeitet werden nur die Uhrzeiten, nicht der Tag: eine Stempelung
+   auf einen anderen Tag zu schieben ist keine Korrektur mehr, sondern
+   eine Erfindung. Wer den Tag verwechselt hat, entfernt den Eintrag
+   und stempelt neu. */
+function ZeitKorrektur({ z, fertig }) {
+  const tagTeil = z.von.slice(0, 10);
+  const hm = (iso) => new Date(iso).toLocaleTimeString("de-DE",
+    { hour: "2-digit", minute: "2-digit", hour12: false });
+
+  const [von, setVon] = useState(hm(z.von));
+  const [bis, setBis] = useState(z.bis ? hm(z.bis) : "");
+  const [fehler, setFehler] = useState("");
+  const [laeuft, setLaeuft] = useState(false);
+  const [sicher, setSicher] = useState(false);
+
+  /* "07:30" am selben Tag — die Zeitzone des Geräts ist die richtige,
+     dort wurde gestempelt. */
+  const zuISO = (t) => t ? new Date(`${tagTeil}T${t}:00`).toISOString() : null;
+
+  const tun = async (was) => {
+    if (laeuft) return;
+    setLaeuft(true); setFehler("");
+    try { await was(); await fertig(); }
+    catch (e) { setFehler(e.message || String(e)); }
+    finally { setLaeuft(false); }
+  };
+
+  return (
+    <div className="wr-panel" style={{ margin:"0 14px 6px" }}>
+      <div className="wr-two wr-two-gleich">
+        <div>
+          <label className="wr-lbl" htmlFor={`von-${z.id}`}>Von</label>
+          <input id={`von-${z.id}`} className="wr-inp" type="time" value={von}
+            onChange={(e) => setVon(e.target.value)} />
+        </div>
+        <div>
+          <label className="wr-lbl" htmlFor={`bis-${z.id}`}>Bis</label>
+          <input id={`bis-${z.id}`} className="wr-inp" type="time" value={bis}
+            onChange={(e) => setBis(e.target.value)} />
+        </div>
+      </div>
+      {!z.bis && !bis && (
+        <p className="wr-hint">Läuft noch. Eine Uhrzeit bei „Bis" beendet sie nachträglich.</p>
+      )}
+      {fehler && <div className="wr-fehler" role="alert"><AlertTriangle size={15} /> {fehler}</div>}
+
+      {!sicher ? (
+        <div className="wr-two" style={{ marginTop: 12 }}>
+          <button className="wr-order" style={{ margin: 0, color: "var(--rot)" }}
+            onClick={() => setSicher(true)}>
+            <Trash2 size={15} /> Entfernen
+          </button>
+          <button className="wr-btn-big" disabled={!von || laeuft}
+            style={{ background: von && !laeuft ? "#FFCC00" : "var(--f)",
+                     color: von && !laeuft ? "#14181B" : "var(--m)", padding: "12px" }}
+            onClick={() => tun(() => zeitAendern(z.id, zuISO(von), zuISO(bis)))}>
+            <Check size={15} /> {laeuft ? "Speichert …" : "Übernehmen"}
+          </button>
+        </div>
+      ) : (
+        <>
+          <p className="wr-hint">Die Stempelung wirklich entfernen? Sie zählt dann nirgends mehr mit.</p>
+          <div className="wr-two" style={{ marginTop: 8 }}>
+            <button className="wr-order" style={{ margin: 0 }} onClick={() => setSicher(false)}>Abbrechen</button>
+            <button className="wr-btn-big" disabled={laeuft}
+              style={{ background: "var(--rot)", color: "var(--ai)", padding: "12px" }}
+              onClick={() => tun(() => zeitLoeschen(z.id))}>
+              {laeuft ? "Entfernt …" : "Ja, entfernen"}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 /* ── Stunden ── */
-export function Stunden({ zurueck, u }) {
+export function Stunden({ zurueck, u, neuLaden }) {
   const { ZEITEN, B, M } = useDaten();
   /* Wer den ganzen Betrieb sehen darf: die Leitung und die Buchhaltung.
      Fuer die Buchhaltung ist "meine Stunden" allerdings sinnlos — sie
@@ -33,6 +112,7 @@ export function Stunden({ zurueck, u }) {
   const leitung = u.zugang === "Leitung";
   const alleSehen = leitung || u.zugang === "Buchhalter";
   const [wer, setWer] = useState(leitung ? "ich" : alleSehen ? "alle" : "ich");
+  const [offen, setOffen] = useState(null);   // Eintrag in Korrektur
 
   const ab = wochenStart().getTime();
   const dieseWoche = ZEITEN.filter((z) => new Date(z.von).getTime() >= ab
@@ -91,16 +171,28 @@ export function Stunden({ zurueck, u }) {
             </div>
             {liste.map((z) => {
               const b = B.find((x) => x.id === z.bId);
+              /* Berichtigen darf, wer es auch in der Datenbank darf:
+                 die Leitung alles, alle anderen ihre eigenen Zeiten.
+                 Ohne Netz sperren wir es — eine Korrektur wandert
+                 nicht in die Warteschlange, sie braucht die Antwort
+                 des Servers. */
+              const darf = (leitung || z.profil === u.id) && !!neuLaden;
+              const auf = offen === z.id;
               return (
-                <div key={z.id} className="wr-task">
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div className="wr-task-t">{b?.name ?? "Unbekannte Baustelle"}</div>
-                    <div className="wr-task-s">
-                      {uhr(z.von)} – {z.bis ? uhr(z.bis) : "läuft"}
-                      {wer === "alle" ? ` · ${M(z.profil).kurz}` : ""}
+                <div key={z.id}>
+                  <button className="wr-task" style={{ width:"100%", cursor: darf ? "pointer" : "default" }}
+                    onClick={() => darf && setOffen(auf ? null : z.id)}>
+                    <div style={{ flex:1, minWidth:0, textAlign:"left" }}>
+                      <div className="wr-task-t">{b?.name ?? "Unbekannte Baustelle"}</div>
+                      <div className="wr-task-s">
+                        {uhr(z.von)} – {z.bis ? uhr(z.bis) : "läuft"}
+                        {wer === "alle" ? ` · ${M(z.profil).kurz}` : ""}
+                        {darf && (auf ? " · schliessen" : " · berichtigen")}
+                      </div>
                     </div>
-                  </div>
-                  <span className="wr-mono-b">{z.dauer != null ? `${zahl(z.dauer)} h` : "—"}</span>
+                    <span className="wr-mono-b">{z.dauer != null ? `${zahl(z.dauer)} h` : "—"}</span>
+                  </button>
+                  {auf && <ZeitKorrektur z={z} fertig={async () => { setOffen(null); await neuLaden(); }} />}
                 </div>
               );
             })}

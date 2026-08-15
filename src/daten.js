@@ -31,26 +31,57 @@ export async function ladeAlles() {
     );
   }
 
-  const hole = async (tabelle, spalten = "*") => {
-    const { data, error } = await supabase.from(tabelle).select(spalten);
-    if (error) throw new Error(`${tabelle}: ${error.message}`);
-    return data ?? [];
+  /* PostgREST liefert nie unbegrenzt viele Zeilen: je nach Einstellung
+     des Projekts schneidet es ab einer Obergrenze ab — und zwar OHNE
+     Fehler. Eine Abfrage ohne Bereich sieht dann vollständig aus und
+     ist es nicht. Bei Aufmaß-Zeilen wären die Summen in der Abrechnung
+     stillschweigend zu klein, und das merkt man erst an einer falschen
+     Rechnung.
+
+     Deshalb holen wir in Blöcken und hören erst auf, wenn ein Block
+     kürzer zurückkommt als angefordert. Die Sortierung muss dabei
+     eindeutig sein, sonst kann eine Zeile zwischen zwei Blöcken
+     durchrutschen oder doppelt kommen. */
+  const BLOCK = 1000;
+
+  const seitenweise = async (tabelle, spalten, sortier) => {
+    const alles = [];
+    for (let von = 0; ; von += BLOCK) {
+      let f = supabase.from(tabelle).select(spalten);
+      for (const s of sortier) f = f.order(s);
+      const { data, error } = await f.range(von, von + BLOCK - 1);
+      if (error) return { fehler: error };
+      alles.push(...(data ?? []));
+      if ((data?.length ?? 0) < BLOCK) return { daten: alles };
+      /* Reissleine gegen eine Sortierung, die doch nicht eindeutig ist:
+         lieber abbrechen als ewig im Kreis laden. */
+      if (alles.length > 200000) {
+        console.warn(`${tabelle}: mehr als 200000 Zeilen — abgebrochen.`);
+        return { daten: alles };
+      }
+    }
+  };
+
+  const hole = async (tabelle, spalten = "*", sortier = ["id"]) => {
+    const { daten, fehler } = await seitenweise(tabelle, spalten, sortier);
+    if (fehler) throw new Error(`${tabelle}: ${fehler.message}`);
+    return daten;
   };
 
   /* Für Tabellen aus späteren Nachträgen. Fehlt eine, fällt nur ihre
      Funktion aus — nicht die ganze App. Vorher legte eine fehlende
      Nebentabelle alles lahm, und der Monteur kam nicht mal an seine
      Baustellen. */
-  const holeWennDa = async (tabelle, spalten = "*") => {
-    const { data, error } = await supabase.from(tabelle).select(spalten);
-    if (error) {
-      if (error.code === "PGRST205" || /schema cache/i.test(error.message || "")) {
+  const holeWennDa = async (tabelle, spalten = "*", sortier = ["id"]) => {
+    const { daten, fehler } = await seitenweise(tabelle, spalten, sortier);
+    if (fehler) {
+      if (fehler.code === "PGRST205" || /schema cache/i.test(fehler.message || "")) {
         console.warn(`Tabelle "${tabelle}" fehlt — zugehörige Funktion ist aus.`);
         return null;
       }
-      throw new Error(`${tabelle}: ${error.message}`);
+      throw new Error(`${tabelle}: ${fehler.message}`);
     }
-    return data ?? [];
+    return daten;
   };
 
   const [betriebe, profile, baustellen, kaufm, crew, artikel, anforderungen, positionen, zeilen, zeiten, fotos, berichte, lvPreise, artPreise] =
@@ -58,17 +89,18 @@ export async function ladeAlles() {
       hole("betrieb", "id,name"),
       hole("profil", "id,name,kurz,rolle,zugang"),
       hole("baustelle"),
-      hole("baustelle_kaufmaennisch", "baustelle_id,kunde,ap,telefon"),
-      hole("baustelle_crew", "baustelle_id,profil_id,heute"),
+      hole("baustelle_kaufmaennisch", "baustelle_id,kunde,ap,telefon", ["baustelle_id"]),
+      /* Kein id-Feld: der Schluessel ist das Paar. */
+      hole("baustelle_crew", "baustelle_id,profil_id,heute", ["baustelle_id", "profil_id"]),
       hole("artikel", "id,txt,eh,lief"),
       hole("anforderung"),
       hole("lv_position"),
       hole("aufmass_zeile"),
-      holeWennDa("zeit", "id,profil_id,baustelle_id,von,bis"),
+      holeWennDa("zeit", "id,profil_id,baustelle_id,von,bis,geloescht_am"),
       holeWennDa("foto", "id,zeile_id,bericht_id,baustelle_id,pfad,erstellt_am"),
       holeWennDa("tagesbericht", "id,baustelle_id,profil_id,datum,text"),
-      holeWennDa("lv_preis", "position_id,ep"),
-      holeWennDa("artikel_preis", "artikel_id,ek,vk"),
+      holeWennDa("lv_preis", "position_id,ep", ["position_id"]),
+      holeWennDa("artikel_preis", "artikel_id,ek,vk", ["artikel_id"]),
     ]);
 
   /* Kaufmännisches kommt nur bei der Leitung an — beim Monteur ist die
@@ -144,11 +176,17 @@ export async function ladeAlles() {
       datum: tag(z.erfasst_am),
     }));
 
+  /* Entfernte Stempelungen bleiben in der Datenbank stehen, damit ein
+     Nachreichen aus dem Funkloch sie nicht wiederbelebt. Hier fallen
+     sie raus — auch aus "laufend", sonst hinge die Uhr an einem
+     Eintrag, den es für den Benutzer nicht mehr gibt. */
+  const zeitenDa = (zeiten ?? []).filter((z) => !z.geloescht_am);
+
   /* Die laufende Stempelung, falls es eine gibt. Der Index in der
      Datenbank stellt sicher, dass es höchstens eine je Person ist. */
-  const laufend = (zeiten ?? []).find((z) => !z.bis && z.profil_id === meinProfil) ?? null;
+  const laufend = zeitenDa.find((z) => !z.bis && z.profil_id === meinProfil) ?? null;
 
-  const ZEITEN = (zeiten ?? [])
+  const ZEITEN = zeitenDa
     .map((z) => ({ id:z.id, profil:z.profil_id, bId:z.baustelle_id, von:z.von, bis:z.bis,
                    dauer: z.bis ? (new Date(z.bis) - new Date(z.von)) / 3600000 : null }))
     .sort((a, b) => new Date(b.von) - new Date(a.von));
@@ -425,6 +463,35 @@ export async function fotoAdressen(pfade, sekunden = 3600) {
   return Object.fromEntries((data ?? [])
     .filter((d) => d.signedUrl)
     .map((d) => [d.path, d.signedUrl]));
+}
+
+/* ── Stempelzeiten berichtigen ───────────────────────────────
+   Aus Stempelungen werden Löhne und Rechnungen. Wer abends merkt, dass
+   er das Ausstempeln um 16:00 vergessen hat, muss das geraderücken
+   können — sonst steht in der Abrechnung eine Zahl, von der alle
+   wissen, dass sie falsch ist.
+
+   Die Regeln in der Datenbank lassen das längst zu: zeit_aendern gibt
+   der Leitung alles und jedem seine eigenen Zeiten. Es fehlte nur der
+   Weg dorthin. */
+export async function zeitAendern(id, von, bis) {
+  if (bis && new Date(bis) <= new Date(von)) {
+    throw new Error("Das Ende liegt vor dem Anfang.");
+  }
+  const { error } = await supabase.from("zeit").update({ von, bis: bis ?? null }).eq("id", id);
+  if (error) {
+    /* Der Index lässt nur eine laufende Stempelung je Person zu. */
+    if (error.code === "23505") throw new Error("Es läuft schon eine andere Stempelung.");
+    throw new Error(error.message);
+  }
+}
+
+/* Entfernen heisst markieren, nicht löschen: ein nachgereichter
+   Vorgang aus der Warteschlange legte den Eintrag sonst wieder an. */
+export async function zeitLoeschen(id) {
+  const { error } = await supabase.from("zeit")
+    .update({ geloescht_am: new Date().toISOString() }).eq("id", id);
+  if (error) throw new Error(error.message);
 }
 
 /* ── Laden mit Rückfallebene ─────────────────────────────────
