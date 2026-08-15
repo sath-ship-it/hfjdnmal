@@ -27,9 +27,15 @@ exception when others then
 end $$;
 
 -- ── Wer darf Geld sehen ──────────────────────────────────────
+-- Der Umweg über ::text ist Absicht, bitte nicht "aufräumen":
+-- Postgres lässt einen frisch angelegten Enum-Wert erst nach dem
+-- Commit verwenden (Fehler 55P04). Der SQL-Editor schickt aber das
+-- ganze Skript als eine Transaktion — 'Buchhalter' wäre hier also
+-- noch nicht benutzbar. Als Text verglichen, ist es nur eine
+-- Zeichenkette und der Enum-Wert wird gar nicht gebraucht.
 create or replace function darf_preise() returns boolean
   language sql stable security definer set search_path = public as $$
-  select coalesce((select zugang in ('Leitung', 'Buchhalter')
+  select coalesce((select zugang::text in ('Leitung', 'Buchhalter')
                    from profil where auth_id = auth.uid()), false)
 $$;
 
