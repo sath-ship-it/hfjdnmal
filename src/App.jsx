@@ -160,7 +160,7 @@ function Heute({ u, anf, go, laufend, stempeln, sek, toMat, kannZeit }) {
             {sendet ? "Moment …" : laeuft ? "Feierabend" : "Einstempeln"}
           </button>
           {!kannZeit && <p className="wr-hint" style={{ margin:"8px 0 0" }}>
-            Zeiterfassung ist noch nicht eingerichtet — der Nachtrag 0002 fehlt in der Datenbank.
+            Zeiterfassung ist noch nicht eingerichtet. Die Leitung muss Nachtrag 0002 einspielen.
           </p>}
           {fehler && <div className="wr-fehler" role="alert"><AlertTriangle size={15} /> {fehler}</div>}
         </div>
@@ -312,8 +312,8 @@ function Anfordern({ u, back, senden }) {
         </button>
         {fehler && <div className="wr-fehler" role="alert"><AlertTriangle size={15} /> {fehler}</div>}
         <p className="wr-hint">
-          Landet sofort in der Sammelliste im Büro. Du siehst unter „Material“, wann sie bestellt wurde
-          und wann sie kommt.
+          Geht sofort ins Büro. Unter „Material“ siehst du, wann bestellt wurde
+          und wann es kommt.
         </p>
       </div>
       <div style={{ height:24 }} />
@@ -390,7 +390,7 @@ function Material({ u, anf, bestellenBei, toAnf }) {
       <div className="wr-seg">
         {["Angefordert", "Bestellt", "Geliefert", "Verbaut"].map((s) => (
           <button key={s} onClick={() => setSeg(s)} className="wr-segb"
-            style={seg === s ? { background:"var(--s)", color:"var(--i)", boxShadow:"0 1px 3px rgba(0,0,0,.09)" } : {}}>
+            style={seg === s ? { background:"var(--spur-an)", color:"var(--i)", boxShadow:"0 1px 3px rgba(0,0,0,.09)" } : {}}>
             {s}
           </button>
         ))}
@@ -581,7 +581,7 @@ function Zeile({ z, eh, aendern, loeschen }) {
       {fehler && <div className="wr-fehler" role="alert"><AlertTriangle size={15} /> {fehler}</div>}
       {sicher ? (
         <>
-          <p className="wr-hint">Zeile wirklich entfernen? Sie verschwindet aus dem Aufmassblatt.</p>
+          <p className="wr-hint">Zeile entfernen? Sie verschwindet aus dem Aufmaßblatt.</p>
           <div className="wr-two">
             <button className="wr-order" style={{ margin:0 }} onClick={() => setSicher(false)}>Behalten</button>
             <button className="wr-btn-big" disabled={sendet}
@@ -667,7 +667,7 @@ function AufmassPos({ posId, zeilen, speichern, fotoZu, aendern, loeschen, back 
           {letzteId
             ? "Ein Foto hängt jetzt an der zuletzt gespeicherten Zeile."
             : "Zuerst die Zeile speichern — dann gehört das Foto zu ihr."}<br />
-          Der Ansatz wird mitgespeichert, nicht nur das Ergebnis. Genau den will der Prüfer beim Kunden sehen.
+          Gespeichert wird der Ansatz, nicht nur das Ergebnis — den will der Prüfer sehen.
         </p>
       </div>
 
@@ -770,8 +770,8 @@ function Bericht({ u, back, speichern, fotoZu }) {
           {sendet ? "Wird gesendet …" : fertig ? "Abgeschickt" : "Bericht abschicken"}
         </button>
         <p className="wr-hint">
-          Das Mikro tut nur so: Es blendet nach zwei Sekunden einen festen Text
-          ein. Echte Spracherkennung kommt später.
+          Das Mikro ist eine Attrappe: Es setzt nach zwei Sekunden einen
+          festen Text ein.
         </p>
       </div>
       <div style={{ height:24 }} />
@@ -1007,6 +1007,7 @@ export const STIL = `
   --f:#E4E9E8;--fz:#E7EBEA;--k:#BCC6C4;--ai:#FFFFFF;
   --ay:#14181B;--rot:${C.rot};--rotbg:#FBE4E1;--fokus:${C.signalDark};--ph1:#D6DEDC;--ph2:#BFCAC7;
   --p1:#9AA5AA;--p2:#2F6FD0;--p3:#8A5A2B;--p4:#6FA22A;--p5:#0E7C86;--p6:#2A3238;
+  --feld:#FFFFFF;--spur:#E4E9E8;--spur-an:#FFFFFF;
   color-scheme:light;
   font-family:'IBM Plex Sans',system-ui,sans-serif;color:var(--i);background:#20262A;min-height:100vh;
   display:flex;align-items:center;justify-content:center;}
@@ -1018,6 +1019,15 @@ export const STIL = `
     --f:#252E33;--fz:#222A2E;--k:#3B454B;--ai:#12171A;
     --rot:#FF8172;--rotbg:#3B211D;--fokus:#FFCC00;--ph1:#2A3338;--ph2:#1E262A;
     --p1:#A9B5BA;--p2:#5D97E8;--p3:#C68F52;--p4:#93C944;--p5:#2FB0BB;--p6:#8C9AA2;
+    /* Eingabefelder lagen auf var(--s) — genau der Farbe der Karte,
+       in der sie stehen. Auf hellem Grund faellt das nicht auf (weiss
+       auf grau), im Dunkeln verschwand der Feldrand. Jetzt eine Stufe
+       heller als beides. */
+    --feld:#232C31;
+    /* Der aktive Reiter war dunkler als seine Spur und wirkte damit
+       versenkt statt erhoben — im Hellen ist es umgekehrt. Spur
+       runter, aktiver Reiter rauf. */
+    --spur:#171D21;--spur-an:#2B353B;
     color-scheme:dark;background:#0D1114;}
 }
 /* Auf dem Geraet fuellt die App den ganzen Bildschirm. Die Begrenzung
@@ -1072,7 +1082,7 @@ export const STIL = `
   justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:600;}
 .wr-icon{width:30px;height:30px;border-radius:8px;background:var(--f);flex:none;display:flex;align-items:center;
   justify-content:center;color:var(--m);}
-.wr-search{display:flex;align-items:center;gap:9px;margin:2px 14px 10px;background:var(--s);border:1px solid var(--h);
+.wr-search{display:flex;align-items:center;gap:9px;margin:2px 14px 10px;background:var(--feld);border:1px solid var(--h);
   border-radius:10px;padding:10px 12px;}
 .wr-search input{flex:1;border:none;outline:none;background:none;font-family:'IBM Plex Sans',sans-serif;font-size:14px;min-width:0;color:var(--i);}
 .wr-x{border:none;background:none;color:var(--m);cursor:pointer;padding:0;display:flex;}
@@ -1118,10 +1128,10 @@ export const STIL = `
 .wr-dl dd{margin:2px 0 0;font-size:14px;line-height:1.4;}
 .wr-pill{display:inline-flex;align-items:center;gap:4px;background:var(--g);border-radius:5px;padding:3px 7px;
   font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--m);flex:none;}
-.wr-select{background:var(--s);border:1px solid var(--h);border-radius:10px;padding:2px 10px;}
+.wr-select{background:var(--feld);border:1px solid var(--h);border-radius:10px;padding:2px 10px;}
 .wr-select select{width:100%;border:none;background:none;outline:none;padding:11px 0;font-family:'IBM Plex Sans',sans-serif;font-size:14px;color:var(--i);}
 .wr-inp::placeholder,.wr-ta textarea::placeholder,.wr-search input::placeholder{color:var(--m);opacity:.75}
-.wr-inp{width:100%;box-sizing:border-box;background:var(--s);border:1px solid var(--h);border-radius:10px;padding:12px;
+.wr-inp{width:100%;box-sizing:border-box;background:var(--feld);border:1px solid var(--h);border-radius:10px;padding:12px;
   font-family:'IBM Plex Sans',sans-serif;font-size:14px;color:var(--i);outline:none;margin-bottom:7px;}
 .wr-ansatz{position:relative;}
 .wr-ansatz .wr-inp{padding-right:96px;font-family:'IBM Plex Mono',monospace;}
@@ -1143,7 +1153,7 @@ export const STIL = `
 .wr-order{display:flex;align-items:center;justify-content:center;gap:7px;width:calc(100% - 28px);margin:8px 14px 0;
   background:var(--s);border:1.5px solid var(--h);border-radius:10px;padding:13px;font-family:'Archivo',sans-serif;
   font-weight:700;font-size:13px;color:var(--i);cursor:pointer;}
-.wr-seg{display:flex;gap:3px;margin:0 14px 12px;background:var(--f);border-radius:10px;padding:3px;}
+.wr-seg{display:flex;gap:3px;margin:0 14px 12px;background:var(--spur);border-radius:10px;padding:3px;}
 .wr-segb{flex:1;border:none;background:none;border-radius:8px;padding:8px 2px;font-family:'Archivo',sans-serif;
   font-weight:600;font-size:11px;color:var(--m);cursor:pointer;}
 .wr-poscard{display:block;width:calc(100% - 28px);margin:0 14px 7px;background:var(--s);border:1px solid var(--h);
@@ -1154,7 +1164,7 @@ export const STIL = `
   align-items:center;justify-content:center;}
 .wr-bigt{font-family:'Archivo',sans-serif;font-weight:700;font-size:15.5px;}
 .wr-ta{position:relative;}
-.wr-ta textarea{width:100%;box-sizing:border-box;background:var(--s);border:1px solid var(--h);border-radius:10px;
+.wr-ta textarea{width:100%;box-sizing:border-box;background:var(--feld);border:1px solid var(--h);border-radius:10px;
   padding:12px 54px 12px 12px;font-family:'IBM Plex Sans',sans-serif;font-size:14px;line-height:1.5;outline:none;resize:none;color:var(--i);}
 .wr-mic{position:absolute;right:9px;bottom:9px;width:38px;height:38px;border-radius:10px;border:1px solid var(--h);
   background:var(--g);color:var(--i);display:flex;align-items:center;justify-content:center;cursor:pointer;}

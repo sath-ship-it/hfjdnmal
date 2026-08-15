@@ -199,9 +199,8 @@ export default function Aufmassblatt({ baustelle, positionen, zeilen, ersteller,
           <div className="wr-locked" style={{ margin:"12px 0 0" }}>
             <AlertTriangle size={15} />
             <span>
-              Kein Druckdialog erschienen? Der Android-Programmteil, in dem
-              die App läuft, bringt keinen mit. Dieselbe Seite im Browser
-              geöffnet kann es: <b>{ADRESSE.replace("https://", "")}</b>
+              Kein Druckdialog? Die App-Hülle bringt keinen mit. Im Browser
+              geht es: <b>{ADRESSE.replace("https://", "")}</b>
               {kopiert ? " — Adresse kopiert." : ""}
               <button className="wr-back2" style={{ marginTop:8, display:"block" }}
                 onClick={async () => {
@@ -213,9 +212,8 @@ export default function Aufmassblatt({ baustelle, positionen, zeilen, ersteller,
           </div>
         )}
         <p className="wr-hint">
-          „Drucken" öffnet den Druckdialog des Geräts — dort gibt es
-          „Als PDF speichern". Die Unterschrift wird getrennt davon
-          beim Vorgang abgelegt, mit Name und Zeitpunkt.
+          „Drucken“ öffnet den Druckdialog; dort gibt es „Als PDF speichern“.
+          Die Unterschrift wird getrennt abgelegt, mit Name und Zeitpunkt.
         </p>
       </div>
       <div style={{ height:24 }} />

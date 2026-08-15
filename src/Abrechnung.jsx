@@ -69,14 +69,14 @@ export default function Abrechnung({ u, oeffne }) {
       {!koennen.preise && (
         <div className="wr-locked">
           <AlertTriangle size={15} />
-          <span>Für diesen Zugang kommen keine Preise an. Ohne sie bleibt jede Summe null.</span>
+          <span>Dieser Zugang bekommt keine Preise. Alle Summen bleiben null.</span>
         </div>
       )}
 
       <div className="wr-seg">
         {GRUPPEN.map((g) => (
           <button key={g.k} onClick={() => setGrp(g.k)} className="wr-segb"
-            style={grp === g.k ? { background:"var(--s)", color:"var(--i)",
+            style={grp === g.k ? { background:"var(--spur-an)", color:"var(--i)",
                                    boxShadow:"0 1px 3px rgba(0,0,0,.09)" } : {}}>
             {g.l}
           </button>
@@ -97,9 +97,8 @@ export default function Abrechnung({ u, oeffne }) {
 
       {liste.length === 0 && (
         <div className="wr-empty">
-          Hier steht gerade nichts.<br />
           {grp === "reif"
-            ? "Abrechnungsreif wird eine Baustelle, sobald sie abgenommen ist."
+            ? "Nichts abrechnungsreif. Eine Baustelle wird es, sobald sie abgenommen ist."
             : "Keine Baustelle in dieser Gruppe."}
         </div>
       )}
@@ -129,10 +128,8 @@ export default function Abrechnung({ u, oeffne }) {
       ))}
 
       <div className="wr-hint" style={{ margin:"14px 18px 24px" }}>
-        Der Aufmaß-Wert ist die tatsächlich erfasste Menge mal Einheitspreis —
-        nicht das, was ausgeschrieben war. Die Abweichung zum LV-Soll ist genau
-        das, worüber mit dem Kunden gesprochen wird. Eine Summe von null bedeutet
-        meist einen fehlenden Preis, nicht fehlende Arbeit.
+        Gerechnet wird mit der erfassten Menge, nicht mit der ausgeschriebenen.
+        Der Unterschied zum LV-Soll ist das, worüber mit dem Kunden gesprochen wird.
       </div>
     </div>
   );

@@ -97,7 +97,7 @@ export default function Login() {
           </button>
         ))}
         <p className="wr-hint">
-          Tippen füllt die Adresse ein. Das Passwort vergibt das Büro —
+          Antippen füllt die Adresse ein. Das Passwort gibt das Büro —
           es steht bewusst nicht in der App.
         </p>
       </div>

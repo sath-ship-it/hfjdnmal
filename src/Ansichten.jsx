@@ -69,7 +69,7 @@ function ZeitKorrektur({ z, fertig }) {
         </div>
       </div>
       {!z.bis && !bis && (
-        <p className="wr-hint">Läuft noch. Eine Uhrzeit bei „Bis" beendet sie nachträglich.</p>
+        <p className="wr-hint">Läuft noch. Eine Uhrzeit bei „Bis“ beendet sie.</p>
       )}
       {fehler && <div className="wr-fehler" role="alert"><AlertTriangle size={15} /> {fehler}</div>}
 
@@ -88,7 +88,7 @@ function ZeitKorrektur({ z, fertig }) {
         </div>
       ) : (
         <>
-          <p className="wr-hint">Die Stempelung wirklich entfernen? Sie zählt dann nirgends mehr mit.</p>
+          <p className="wr-hint">Stempelung entfernen? Sie zählt dann nirgends mehr mit.</p>
           <div className="wr-two" style={{ marginTop: 8 }}>
             <button className="wr-order" style={{ margin: 0 }} onClick={() => setSicher(false)}>Abbrechen</button>
             <button className="wr-btn-big" disabled={laeuft}
@@ -143,7 +143,7 @@ export function Stunden({ zurueck, u, neuLaden }) {
         <div className="wr-seg">
           {[["ich","Meine"],["alle","Ganzer Betrieb"]].map(([k, l]) => (
             <button key={k} onClick={() => setWer(k)} className="wr-segb"
-              style={wer === k ? { background:"var(--s)", color:"var(--i)", boxShadow:"0 1px 3px rgba(0,0,0,.09)" } : {}}>
+              style={wer === k ? { background:"var(--spur-an)", color:"var(--i)", boxShadow:"0 1px 3px rgba(0,0,0,.09)" } : {}}>
               {l}
             </button>
           ))}
@@ -187,7 +187,7 @@ export function Stunden({ zurueck, u, neuLaden }) {
                       <div className="wr-task-s">
                         {uhr(z.von)} – {z.bis ? uhr(z.bis) : "läuft"}
                         {wer === "alle" ? ` · ${M(z.profil).kurz}` : ""}
-                        {darf && (auf ? " · schliessen" : " · berichtigen")}
+                        {darf && (auf ? " · schließen" : " · berichtigen")}
                       </div>
                     </div>
                     <span className="wr-mono-b">{z.dauer != null ? `${zahl(z.dauer)} h` : "—"}</span>

@@ -109,7 +109,9 @@ function Maske({ titel, unter, zurueck, eintraege, zeile, formular, speichern, g
         </div>
       )}
 
-      <div className="wr-eyebrow"><span>Vorhanden</span><span className="wr-eyebrow-r">{eintraege.length}</span></div>
+      <div className="wr-eyebrow">
+        <span>{eintraege.length ? "Vorhanden · antippen zum Ändern" : "Vorhanden"}</span>
+        <span className="wr-eyebrow-r">{eintraege.length}</span></div>
       {eintraege.map((e) => (
         <button key={e.id} className="wr-task" style={{ width:"100%", cursor:"pointer", textAlign:"left" }}
           onClick={() => oeffnen(e)}>
@@ -132,7 +134,7 @@ function Baustellen({ zurueck, speichern, crewSetzen }) {
   const s = (k) => (e) => setF({ ...f, [k]: e.target.value });
 
   return (
-    <Maske titel="Baustellen" unter="Anlegen oder antippen zum Ändern. Zugeteilte Monteure sehen sie sofort."
+    <Maske titel="Baustellen" unter="Zugeteilte Monteure sehen eine Baustelle sofort."
       zurueck={zurueck} eintraege={B} leeren={() => setF(leer)}
       gueltig={!!f.nr.trim() && !!f.name.trim()}
       laden={(b) => setF({ nr:b.nr, name:b.name, adr:b.adr ?? "", phase:b.phase,
@@ -176,8 +178,8 @@ function Baustellen({ zurueck, speichern, crewSetzen }) {
           );
         })}
         <p className="wr-hint">
-          Ohne Zuteilung sieht die Baustelle nur die Leitung — die Rechteregel
-          schickt sie anderen gar nicht erst.
+          Ohne Zuteilung sieht die Baustelle nur die Leitung — andere
+          bekommen sie gar nicht geschickt.
         </p>
       </>} />
   );
@@ -191,7 +193,7 @@ function Artikel({ zurueck, speichern, darfPreise }) {
   const leer = { txt:"", eh:"St", lief:"", ek:"", vk:"" };
   const [f, setF] = useState(leer);
   return (
-    <Maske titel="Artikelstamm" unter="Was angefordert werden kann. Antippen zum Ändern — auch für Preise."
+    <Maske titel="Artikelstamm" unter="Was angefordert werden kann."
       zurueck={zurueck} eintraege={ARTIKEL} leeren={() => setF(leer)}
       gueltig={!!f.txt.trim()} speichern={(id) => speichern(f, id)}
       laden={(a) => setF({ txt:a.txt, eh:a.eh, lief:a.lief === "—" ? "" : (a.lief ?? ""),
@@ -232,7 +234,7 @@ function Positionen({ zurueck, speichern, darfPreise }) {
   const meine = POS.filter((p) => p.bId === bs);
 
   return (
-    <Maske titel="Leistungsverzeichnis" unter="Positionen, gegen die aufgemessen wird. Antippen zum Ändern."
+    <Maske titel="Leistungsverzeichnis" unter="Positionen, gegen die aufgemessen wird."
       zurueck={zurueck} eintraege={meine} leeren={() => setF(leer)}
       gueltig={!!f.nr.trim() && !!f.txt.trim() && !!bs}
       speichern={(id) => speichern(bs, f, id)}
@@ -277,7 +279,7 @@ function Mitarbeiter({ zurueck, speichern }) {
   const leer = { name:"", kurz:"", rolle:"", zugang:"Monteur" };
   const [f, setF] = useState(leer);
   return (
-    <Maske titel="Mitarbeiter" unter="Wer im Betrieb ist. Antippen zum Ändern; ein Zugang kommt getrennt dazu."
+    <Maske titel="Mitarbeiter" unter="Wer im Betrieb ist. Zugänge kommen getrennt dazu."
       zurueck={zurueck} eintraege={team} leeren={() => setF(leer)}
       gueltig={!!f.name.trim() && !!f.kurz.trim()} speichern={(id) => speichern(f, id)}
       laden={(m) => setF({ name:m.name, kurz:m.kurz, rolle:m.rolle ?? "", zugang:m.zugang })}
