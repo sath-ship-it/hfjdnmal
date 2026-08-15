@@ -26,10 +26,22 @@ await seite.waitForTimeout(2500);
 
 const inhalt = await seite.evaluate(() => document.getElementById("root")?.innerHTML.length ?? -1);
 const anmeldung = await seite.locator(".wr-anmelde").count();
+
+/* Der Service Worker muss sich schon auf dem Anmeldebildschirm melden.
+   Er hing einmal im angemeldeten Baum — dann gibt es vor der ersten
+   Anmeldung keinen, und ein Geraet bleibt fuer immer auf der Fassung,
+   mit der es installiert wurde. Der Build merkt davon nichts, die App
+   startet ja. Nur ueber localhost oder https pruefbar. */
+const sw = await seite.evaluate(() => Promise.race([
+  navigator.serviceWorker?.ready.then(() => "angemeldet") ?? "nicht unterstuetzt",
+  new Promise((r) => setTimeout(() => r("KEINER"), 15000)),
+]));
 await browser.close();
 
-console.log(`Inhalt: ${inhalt} Zeichen · Anmeldebildschirm: ${anmeldung}`);
+console.log(`Inhalt: ${inhalt} Zeichen · Anmeldebildschirm: ${anmeldung} · Service Worker: ${sw}`);
 if (fehler.length) { console.error("Fehler:"); fehler.forEach((f) => console.error("  " + f)); }
 
-if (inhalt < 50 || anmeldung !== 1 || fehler.length) { console.error("RAUCHTEST GESCHEITERT"); process.exit(1); }
+if (inhalt < 50 || anmeldung !== 1 || sw === "KEINER" || fehler.length) {
+  console.error("RAUCHTEST GESCHEITERT"); process.exit(1);
+}
 console.log("Rauchtest bestanden.");

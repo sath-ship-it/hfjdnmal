@@ -80,6 +80,25 @@ function rechne(s) {
   return isFinite(v) ? Math.round(v * 100) / 100 : null;
 }
 
+/* Rahmen für alle Zustände vor der fertigen App: Warten, Anmelden,
+   Ladefehler.
+
+   Das <Aktualisierung/> darin ist der eigentliche Zweck. Dort meldet
+   sich der Service Worker an — stand es nur im angemeldeten Baum, gab
+   es vor der ersten Anmeldung gar keinen: kein Offline-Start, keine
+   Update-Prüfung, und ein Gerät, das nie angemeldet war, hing für
+   immer auf der Fassung, mit der es installiert wurde.
+
+   Steht bewusst hier draußen und nicht in App: eine im Rendern
+   erzeugte Komponente ist bei jedem Durchlauf eine neue, React würfe
+   den Teilbaum jedes Mal weg — das Anmeldeformular verlöre bei jedem
+   Tastendruck seinen Inhalt. */
+const Huelle = ({ children }) => (
+  <div className="wr-root"><style>{STIL}</style>
+    <div className="wr-phone">{children}<Aktualisierung /></div>
+  </div>
+);
+
 /* ── Bausteine ───────────────────────────────────────────── */
 const Stripe = ({ phase, ruht }) => {
   const c = PHASE[phase].c;
@@ -1264,26 +1283,24 @@ export default function App() {
 
   /* ── Zustände vor der eigentlichen App ── */
   if (sitzung === undefined) {
-    return <div className="wr-root"><style>{STIL}</style>
-      <div className="wr-phone"><div className="wr-mitte">Einen Moment …</div></div></div>;
+    return <Huelle><div className="wr-mitte">Einen Moment …</div></Huelle>;
   }
   if (!sitzung) {
-    return <div className="wr-root"><style>{STIL}</style>
-      <div className="wr-phone"><Login /></div></div>;
+    return <Huelle><Login /></Huelle>;
   }
   if (ladefehler) {
-    return <div className="wr-root"><style>{STIL}</style>
-      <div className="wr-phone"><div className="wr-mitte">
+    return <Huelle>
+      <div className="wr-mitte">
         <AlertTriangle size={24} color={C.rot} />
         <p style={{ margin:"12px 0 0", fontSize:14, lineHeight:1.5 }}>{ladefehler}</p>
         <button className="wr-order" style={{ width:"100%", margin:"16px 0 0" }}
           onClick={neuLaden}>Nochmal versuchen</button>
         <button className="wr-order" style={{ width:"100%" }} onClick={abmelden}>Abmelden</button>
-      </div></div></div>;
+      </div>
+    </Huelle>;
   }
   if (!daten) {
-    return <div className="wr-root"><style>{STIL}</style>
-      <div className="wr-phone"><div className="wr-mitte">Daten werden geladen …</div></div></div>;
+    return <Huelle><div className="wr-mitte">Daten werden geladen …</div></Huelle>;
   }
 
   const D = baueDaten(daten);
