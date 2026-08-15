@@ -189,7 +189,7 @@ const euro = (n) => n == null ? "—" : n.toLocaleString("de-DE", { style:"curre
 
 /* ── Artikel ── */
 function Artikel({ zurueck, speichern, darfPreise }) {
-  const { ARTIKEL } = useDaten();
+  const { ARTIKEL, koennen } = useDaten();
   const leer = { txt:"", eh:"St", lief:"", ean:"", ek:"", vk:"" };
   const [f, setF] = useState(leer);
   return (
@@ -215,9 +215,13 @@ function Artikel({ zurueck, speichern, darfPreise }) {
         <Auswahl label="Einheit" wert={f.eh} setzen={(v) => setF({ ...f, eh:v })} werte={EINHEITEN} />
         <Feld label="Lieferant" value={f.lief} onChange={(e) => setF({ ...f, lief:e.target.value })}
           placeholder="Sonepar" />
-        <Feld label="Strichcode (EAN)" value={f.ean} inputMode="numeric"
-          onChange={(e) => setF({ ...f, ean:e.target.value.replace(/\D/g, "") })}
-          placeholder="4001234500017" />
+        {/* Ohne Nachtrag 0005 gibt es die Spalte nicht — dann auch kein
+            Feld, das beim Speichern stillschweigend verfaellt. */}
+        {koennen.ean && (
+          <Feld label="Strichcode (EAN)" value={f.ean} inputMode="numeric"
+            onChange={(e) => setF({ ...f, ean:e.target.value.replace(/\D/g, "") })}
+            placeholder="4001234500017" />
+        )}
         {darfPreise && <>
           <Feld label="Einkauf (netto)" value={f.ek} inputMode="decimal"
             onChange={(e) => setF({ ...f, ek:e.target.value })} placeholder="2,35" />

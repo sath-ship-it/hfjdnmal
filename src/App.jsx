@@ -207,7 +207,7 @@ function Heute({ u, anf, go, laufend, stempeln, sek, toMat, kannZeit }) {
 
 /* ── Material anfordern (Monteur) ────────────────────────── */
 function Anfordern({ u, back, senden }) {
-  const { ARTIKEL, A, sichtbar } = useDaten();
+  const { ARTIKEL, A, sichtbar, koennen } = useDaten();
   const darfPreise = rechte(u).preise;
   const mein = sichtbar(u).filter((b) => b.phase === "In Arbeit" || b.phase === "Beauftragt");
   const [bs, setBs] = useState(mein[0]?.id);
@@ -257,10 +257,12 @@ function Anfordern({ u, back, senden }) {
             </div>
           </button>
         ))}
-        <button className="wr-order" style={{ width:"100%", margin:"8px 0 0" }}
-          onClick={() => setScannt(true)}>
-          <Camera size={15} /> Barcode scannen
-        </button>
+        {koennen.ean && (
+          <button className="wr-order" style={{ width:"100%", margin:"8px 0 0" }}
+            onClick={() => setScannt(true)}>
+            <Camera size={15} /> Barcode scannen
+          </button>
+        )}
         {scannt && (
           <Scanner schliessen={() => setScannt(false)}
             /* Gibt true zurueck, wenn der Code passte — daran erkennt

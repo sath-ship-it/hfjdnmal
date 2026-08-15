@@ -62,8 +62,25 @@ export async function ladeAlles() {
     }
   };
 
-  const hole = async (tabelle, spalten = "*", sortier = ["id"]) => {
-    const { daten, fehler } = await seitenweise(tabelle, spalten, sortier);
+  /* Spalten aus spaeteren Nachtraegen. Dieselbe Falle wie bei den
+     Tabellen, nur eine Ebene tiefer: steht eine Spalte in der Abfrage,
+     die es noch nicht gibt, antwortet PostgREST mit 42703 und die
+     GANZE App bleibt stehen — auch alles, was mit dieser Spalte nichts
+     zu tun hat. Deshalb wird sie einzeln nachgefragt und fehlt sie,
+     laeuft der Rest ohne sie weiter. */
+  const fehlendeSpalte = (f) =>
+    f?.code === "42703" || /column .* does not exist/i.test(f?.message || "");
+
+  const ohneSpalte = new Set();
+
+  const hole = async (tabelle, spalten = "*", sortier = ["id"], nachtrag = []) => {
+    const mitAllem = [spalten, ...nachtrag].filter(Boolean).join(",");
+    let { daten, fehler } = await seitenweise(tabelle, mitAllem, sortier);
+    if (fehler && nachtrag.length && fehlendeSpalte(fehler)) {
+      console.warn(`${tabelle}: Spalte ${nachtrag.join(", ")} fehlt — Funktion ist aus.`);
+      nachtrag.forEach((s) => ohneSpalte.add(`${tabelle}.${s}`));
+      ({ daten, fehler } = await seitenweise(tabelle, spalten, sortier));
+    }
     if (fehler) throw new Error(`${tabelle}: ${fehler.message}`);
     return daten;
   };
@@ -92,7 +109,7 @@ export async function ladeAlles() {
       hole("baustelle_kaufmaennisch", "baustelle_id,kunde,ap,telefon", ["baustelle_id"]),
       /* Kein id-Feld: der Schluessel ist das Paar. */
       hole("baustelle_crew", "baustelle_id,profil_id,heute", ["baustelle_id", "profil_id"]),
-      hole("artikel", "id,txt,eh,lief,ean"),
+      hole("artikel", "id,txt,eh,lief", ["id"], ["ean"]),
       hole("anforderung"),
       hole("lv_position"),
       hole("aufmass_zeile"),
@@ -204,7 +221,10 @@ export async function ladeAlles() {
 
     /* Was die Oberfläche ausgrauen muss, weil der Nachtrag fehlt. */
   const koennen = { zeit: zeiten !== null, fotos: fotos !== null, berichte: berichte !== null,
-                    preise: lvPreise !== null && lvPreise.length >= 0 && artPreise !== null };
+                    preise: lvPreise !== null && lvPreise.length >= 0 && artPreise !== null,
+                    /* Ohne Nachtrag 0005 gibt es keinen Strichcode: dann
+                       weder Scanner anbieten noch beim Speichern mitschicken. */
+                    ean: !ohneSpalte.has("artikel.ean") };
 
   return { meinProfil, betriebId, betrieb: betriebe[0]?.name ?? "", team, B, ARTIKEL, anf, POS, ZEILEN,
            ZEITEN, BERICHTE, FOTOS, laufend, koennen };
@@ -378,11 +398,19 @@ const komma = (v) => {
 
 export async function artikelSpeichern(betriebId, f, id) {
   const aId = id ?? crypto.randomUUID();
-  const { error } = await supabase.from("artikel").upsert({
+  const satz = {
     id: aId, betrieb_id: betriebId,
     txt: f.txt.trim(), eh: f.eh.trim(), lief: f.lief?.trim() || null,
-    ean: f.ean?.trim() || null,
-  });
+  };
+  /* Gleiche Vorsicht wie beim Lesen: fehlt der Nachtrag 0005, weist
+     die Datenbank den ganzen Satz zurueck — samt Bezeichnung und
+     Preis. Dann lieber ohne Strichcode speichern. */
+  const mitEan = { ...satz, ean: f.ean?.trim() || null };
+  let { error } = await supabase.from("artikel").upsert(mitEan);
+  if (error && (error.code === "42703" || error.code === "PGRST204"
+                || /column .* does not exist|'ean' column/i.test(error.message || ""))) {
+    ({ error } = await supabase.from("artikel").upsert(satz));
+  }
   if (error) throw new Error(error.message);
 
   /* Preise nur, wenn welche angegeben wurden. Ein Monteur bekommt die
