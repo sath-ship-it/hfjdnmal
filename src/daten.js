@@ -92,7 +92,7 @@ export async function ladeAlles() {
       hole("baustelle_kaufmaennisch", "baustelle_id,kunde,ap,telefon", ["baustelle_id"]),
       /* Kein id-Feld: der Schluessel ist das Paar. */
       hole("baustelle_crew", "baustelle_id,profil_id,heute", ["baustelle_id", "profil_id"]),
-      hole("artikel", "id,txt,eh,lief"),
+      hole("artikel", "id,txt,eh,lief,ean"),
       hole("anforderung"),
       hole("lv_position"),
       hole("aufmass_zeile"),
@@ -139,7 +139,7 @@ export async function ladeAlles() {
   const lvPreisNach  = Object.fromEntries((lvPreise ?? []).map((p) => [p.position_id, p]));
 
   const ARTIKEL = artikel.map((a) => ({
-    id: a.id, txt: a.txt, eh: a.eh, lief: a.lief ?? "—",
+    id: a.id, txt: a.txt, eh: a.eh, lief: a.lief ?? "—", ean: a.ean ?? null,
     ek: artPreisNach[a.id]?.ek != null ? Number(artPreisNach[a.id].ek) : null,
     vk: artPreisNach[a.id]?.vk != null ? Number(artPreisNach[a.id].vk) : null,
   }));
@@ -381,6 +381,7 @@ export async function artikelSpeichern(betriebId, f, id) {
   const { error } = await supabase.from("artikel").upsert({
     id: aId, betrieb_id: betriebId,
     txt: f.txt.trim(), eh: f.eh.trim(), lief: f.lief?.trim() || null,
+    ean: f.ean?.trim() || null,
   });
   if (error) throw new Error(error.message);
 

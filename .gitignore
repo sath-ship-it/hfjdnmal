@@ -19,6 +19,9 @@ android/capacitor-cordova-android-plugins
 *.apk
 *.keystore
 *.jks
+# Der Signaturschluessel gehoert nirgendwo hin, wo ihn jemand lesen
+# kann — das Verzeichnis ist oeffentlich. Er lebt als GitHub-Secret.
+schluessel/
 vorschau/
 dist/pakete
 dist/aktuell.json

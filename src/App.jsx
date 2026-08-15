@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Home, HardHat, Plus, Package, MoreHorizontal, Search, ChevronLeft, ChevronRight,
   Phone, MapPin, Mic, Camera, Clock, Play, Square, X, Lock, AlertTriangle, Receipt,
@@ -9,6 +9,7 @@ import Login from "./Login.jsx";
 import FotoKnopf from "./Foto.jsx";
 import Aufmassblatt from "./Aufmassblatt.jsx";
 import Abrechnung from "./Abrechnung.jsx";
+import Scanner from "./Scanner.jsx";
 import { zahl, euro } from "./format.js";
 import Stammdaten from "./Stammdaten.jsx";
 import { Stunden, Berichte, Fotos } from "./Ansichten.jsx";
@@ -206,7 +207,6 @@ function Heute({ u, anf, go, laufend, stempeln, sek, toMat, kannZeit }) {
 
 /* ── Material anfordern (Monteur) ────────────────────────── */
 function Anfordern({ u, back, senden }) {
-  const bald = useBald();
   const { ARTIKEL, A, sichtbar } = useDaten();
   const darfPreise = rechte(u).preise;
   const mein = sichtbar(u).filter((b) => b.phase === "In Arbeit" || b.phase === "Beauftragt");
@@ -216,9 +216,12 @@ function Anfordern({ u, back, senden }) {
   const [wann, setWann] = useState("Mo 17.08.");
   const [dringend, setDringend] = useState(false);
   const [fehler, setFehler] = useState("");
+  const [scannt, setScannt] = useState(false);
 
   const treffer = q ? ARTIKEL.filter((a) => a.txt.toLowerCase().includes(q.toLowerCase())).slice(0, 5) : [];
-  const add = (a) => { setKorb([...korb, { aId:a.id, menge:1 }]); setQ(""); };
+  /* Funktional, nicht ueber korb aus dem Abschluss: der Scanner ruft
+     das aus einem alten Durchlauf heraus auf. */
+  const add = (a) => { setKorb((k) => [...k, { aId:a.id, menge:1 }]); setQ(""); };
   const setMenge = (i, v) => setKorb(korb.map((k, j) => j === i ? { ...k, menge:Math.max(0, v) } : k));
 
   return (
@@ -255,9 +258,21 @@ function Anfordern({ u, back, senden }) {
           </button>
         ))}
         <button className="wr-order" style={{ width:"100%", margin:"8px 0 0" }}
-          onClick={() => bald("Der Barcode-Scanner")}>
+          onClick={() => setScannt(true)}>
           <Camera size={15} /> Barcode scannen
         </button>
+        {scannt && (
+          <Scanner schliessen={() => setScannt(false)}
+            /* Gibt true zurueck, wenn der Code passte — daran erkennt
+               der Scanner, dass er aufhoeren darf. */
+            suchen={(code) => {
+              const a = ARTIKEL.find((x) => x.ean && x.ean === code);
+              if (!a) return false;
+              add(a);
+              setScannt(false);
+              return true;
+            }} />
+        )}
         {q && treffer.length === 0 && (
           <div className="wr-hit" style={{ color:C.mute, fontSize:13 }}>
             Nicht im Stamm. Trotzdem anfordern – Büro legt den Artikel an.
@@ -721,14 +736,48 @@ function Bericht({ u, back, speichern, fotoZu }) {
   const [sendet, setSendet] = useState(false);
   const [fehler, setFehler] = useState("");
   const [fertig, setFertig] = useState(null);   // id des gespeicherten Berichts
-  useEffect(() => {
-    if (!rec) return;
-    const t = setTimeout(() => {
-      setTxt("RLT-Kanalfühler Position x2 nach Wärmetauscher gesetzt und verdrahtet. Kabelrinne im UG abgehängt.");
+  const [diktatFehler, setDiktatFehler] = useState("");
+  const diktat = useRef(null);
+
+  /* Echtes Diktat statt der bisherigen Attrappe, die nach zwei
+     Sekunden einen festen Text einsetzte.
+
+     Die Spracherkennung des Browsers gibt es nicht ueberall — in der
+     Android-App haengt sie daran, ob die Huelle den Dienst
+     durchreicht. Fehlt sie, sagen wir das, statt einen Knopf
+     anzubieten, der nichts tut. */
+  const Erkennung = globalThis.SpeechRecognition ?? globalThis.webkitSpeechRecognition;
+
+  const diktieren = () => {
+    if (rec) { diktat.current?.stop(); return; }
+    if (!Erkennung) { setDiktatFehler("Dieses Gerät bietet keine Spracherkennung. Bitte tippen."); return; }
+    setDiktatFehler("");
+    const e = new Erkennung();
+    e.lang = "de-DE";
+    e.continuous = true;
+    e.interimResults = false;
+    /* Anhaengen, nicht ersetzen: wer schon getippt hat, verliert es
+       sonst beim Diktieren. */
+    e.onresult = (v) => {
+      let neu = "";
+      for (let i = v.resultIndex; i < v.results.length; i++) neu += v.results[i][0].transcript;
+      if (neu.trim()) setTxt((alt) => (alt ? alt.trimEnd() + " " : "") + neu.trim());
+    };
+    e.onerror = (v) => {
+      setDiktatFehler(v.error === "not-allowed"
+        ? "Zugriff aufs Mikrofon abgelehnt. In den Einstellungen erlauben."
+        : "Spracherkennung fehlgeschlagen. Bitte tippen.");
       setRec(false);
-    }, 2000);
-    return () => clearTimeout(t);
-  }, [rec]);
+    };
+    e.onend = () => setRec(false);
+    diktat.current = e;
+    try { e.start(); setRec(true); }
+    catch { setDiktatFehler("Spracherkennung liess sich nicht starten."); }
+  };
+
+  /* Verlaesst man den Bildschirm mitten im Diktat, bleibt das Mikro
+     sonst offen. */
+  useEffect(() => () => { try { diktat.current?.abort(); } catch { /* egal */ } }, []);
   return (
     <div className="wr-scroll">
       <div className="wr-sheethead">
@@ -747,11 +796,15 @@ function Bericht({ u, back, speichern, fotoZu }) {
         <div className="wr-ta">
           <textarea rows={5} value={txt} onChange={(e) => setTxt(e.target.value)}
             placeholder={rec ? "Hört zu …" : "Tippen – oder Mikro drücken und erzählen."} />
-          <button className="wr-mic" onClick={() => setRec(true)} style={rec ? { background:C.ink, color:C.signal } : {}}>
+          <button className="wr-mic" onClick={diktieren} aria-label={rec ? "Diktat beenden" : "Diktieren"}
+            style={rec ? { background:C.ink, color:C.signal } : {}}>
             <Mic size={18} />
           </button>
         </div>
-        {rec && <div className="wr-rec">Aufnahme läuft …</div>}
+        {rec && <div className="wr-rec">Hört zu — nochmal tippen beendet.</div>}
+        {diktatFehler && (
+          <div className="wr-fehler" role="alert"><AlertTriangle size={15} /> {diktatFehler}</div>
+        )}
         <label className="wr-lbl">Fotos</label>
         <div className="wr-photos">
           <FotoKnopf gross hochladen={(d) => fotoZu(bs, null, d, fertig)} />
@@ -770,8 +823,8 @@ function Bericht({ u, back, speichern, fotoZu }) {
           {sendet ? "Wird gesendet …" : fertig ? "Abgeschickt" : "Bericht abschicken"}
         </button>
         <p className="wr-hint">
-          Das Mikro ist eine Attrappe: Es setzt nach zwei Sekunden einen
-          festen Text ein.
+          Das Mikro diktiert in das Feld hinein und hängt an, was schon
+          dasteht. Nochmal antippen beendet.
         </p>
       </div>
       <div style={{ height:24 }} />
@@ -953,6 +1006,7 @@ function Mehr({ u, abmelden, betrieb, neuLaden, stamm, zeige }) {
       </div>
       <button className="wr-order" onClick={abmelden}>Abmelden</button>
       <button className="wr-order" onClick={neuLaden}>Daten neu laden</button>
+      <p className="wr-hint" style={{ margin:"6px 16px 0" }}>Fassung {__FASSUNG__}</p>
       {/* Erfasstes und Stammdaten gehoeren auch der Buchhaltung: daraus
           werden die Rechnungen. Was sie NICHT darf — Zugaenge vergeben,
           Baustellen und Mitarbeiter anlegen — sperrt Stammdaten selbst
@@ -1166,6 +1220,18 @@ export const STIL = `
 .wr-ta{position:relative;}
 .wr-ta textarea{width:100%;box-sizing:border-box;background:var(--feld);border:1px solid var(--h);border-radius:10px;
   padding:12px 54px 12px 12px;font-family:'IBM Plex Sans',sans-serif;font-size:14px;line-height:1.5;outline:none;resize:none;color:var(--i);}
+/* Strichcode-Leser: liegt ueber der Seite, damit das Bild gross genug
+   ist, um einen Code zu treffen. */
+.wr-scanner{position:absolute;inset:0;z-index:20;background:var(--g);display:flex;flex-direction:column;
+  padding-top:var(--oben);}
+.wr-scanner-kopf{flex:none;display:flex;align-items:center;gap:10px;padding:13px 14px;
+  font-family:'Archivo',sans-serif;font-weight:700;font-size:14px;border-bottom:1px solid var(--h);}
+.wr-scanner-kopf span{flex:1;}
+.wr-scanner-x{flex:none;border:none;background:none;color:var(--i);cursor:pointer;padding:2px;}
+.wr-scanner-bild{position:relative;flex:1;min-height:0;background:#000;overflow:hidden;}
+.wr-scanner-bild video{width:100%;height:100%;object-fit:cover;display:block;}
+.wr-scanner-rahmen{position:absolute;left:12%;right:12%;top:38%;height:24%;border:2.5px solid var(--y);
+  border-radius:12px;box-shadow:0 0 0 100vmax rgba(0,0,0,.45);}
 .wr-mic{position:absolute;right:9px;bottom:9px;width:38px;height:38px;border-radius:10px;border:1px solid var(--h);
   background:var(--g);color:var(--i);display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .wr-rec{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--m);margin-top:7px;animation:wrp 1.1s ease-in-out infinite;}
@@ -1372,25 +1438,67 @@ export default function App() {
   /* Jeder Schreibweg bekommt seine Nummern VOR dem Senden. Klappt es
      nicht am Netz, wandert der Vorgang mit genau diesen Nummern in die
      Warteschlange — ein zweiter Versuch erzeugt dann kein Doppel. */
-  const merken = async (art, n, tun) => {
-    const { gesendet } = await schreibenOderMerken(art, n, tun, wer);
+  /* Nach jedem Schreiben lud die App alle vierzehn Tabellen neu, und
+     die Oberflaeche wartete darauf. Bei einem Balken Empfang heisst
+     das: nach jeder Aufmass-Zeile ein voller Rundgang, bevor man
+     weitertippen kann.
+
+     Jetzt zwei getrennte Wege:
+       sofort()     traegt die Aenderung in den vorhandenen Stand ein.
+                    Kostet nichts und ist sofort auf dem Schirm.
+       abgleichen() holt im Hintergrund alles nach — gebuendelt, damit
+                    zehn Zeilen hintereinander einen Rundgang
+                    ausloesen und nicht zehn.
+
+     Der Abgleich ist die Wahrheit; die Sofort-Eintragung darf ruhig
+     ungenau sein, sie wird ueberschrieben. Geht das Schreiben schief,
+     holen wir sie unverzueglich zurueck. */
+  const sofort = (aendern) => setDaten((d) => (d ? aendern(d) : d));
+  /* Muss zur Darstellung aus der Datenschicht passen: "15.08." */
+  const kurzDatum = () => new Date().toLocaleDateString("de-DE", { day:"2-digit", month:"2-digit" }) + "";
+
+  const abgleichUhr = useRef(null);
+  const abgleichen = useCallback(() => {
+    clearTimeout(abgleichUhr.current);
+    abgleichUhr.current = setTimeout(() => { neuLaden(); }, 1500);
+  }, [neuLaden]);
+
+  useEffect(() => () => clearTimeout(abgleichUhr.current), []);
+
+  const merken = async (art, n, tun, jetztSchon) => {
+    if (jetztSchon) sofort(jetztSchon);
+    let gesendet;
+    try {
+      ({ gesendet } = await schreibenOderMerken(art, n, tun, wer));
+    } catch (e) {
+      /* Die Sofort-Eintragung war voreilig — zurueck auf den Stand
+         des Servers, sonst steht etwas da, das es nicht gibt. */
+      if (jetztSchon) neuLaden();
+      throw e;
+    }
     setOffen(schlangeMeine(wer).length);
-    if (gesendet) await neuLaden();
+    if (gesendet) abgleichen();
     return gesendet;
   };
 
   const senden = async (bId, korb, wann, dringend) => {
     const ids = korb.map(() => crypto.randomUUID());
     const n = { betriebId: daten.betriebId, bId, korb, wann, dringend, profil: daten.meinProfil, ids };
-    await merken("anforderung", n, () =>
-      anforderungSenden(n.betriebId, bId, korb, wann, dringend, n.profil, ids));
+    await merken("anforderung", n,
+      () => anforderungSenden(n.betriebId, bId, korb, wann, dringend, n.profil, ids),
+      (d) => ({ ...d, anf: [...d.anf, ...korb.map((k, i) => ({
+        id: ids[i], bId, aId: k.aId, freitext: null, menge: k.menge,
+        von: n.profil, wann: wann ?? "", dringend, status: "Angefordert",
+      }))] }));
   };
 
   const zeileSpeichern = async (posId, ort, ansatz, menge) => {
     const id = crypto.randomUUID();
     const n = { betriebId: daten.betriebId, posId, ort, ansatz, menge, profil: daten.meinProfil, id };
-    await merken("aufmass", n, () =>
-      aufmassSpeichern(n.betriebId, posId, ort, ansatz, menge, n.profil, id));
+    await merken("aufmass", n,
+      () => aufmassSpeichern(n.betriebId, posId, ort, ansatz, menge, n.profil, id),
+      (d) => ({ ...d, ZEILEN: [...d.ZEILEN,
+        { id, pId: posId, ort, ansatz, menge, foto: false, datum: kurzDatum() }] }));
     return id;
   };
   const bestellenBei = async (ids, liefertermin) => {
@@ -1405,26 +1513,46 @@ export default function App() {
       /* Der Zeitpunkt zaehlt jetzt, nicht beim Nachreichen — sonst
          verschenkt der Monteur die Zeit im Funkloch. */
       const bis = new Date().toISOString();
-      await merken("ausstempeln", { zeitId: daten.laufend.id, bis },
-        () => ausstempeln(daten.laufend.id, bis));
+      const zId = daten.laufend.id;
+      await merken("ausstempeln", { zeitId: zId, bis }, () => ausstempeln(zId, bis),
+        (d) => ({ ...d, laufend: null,
+          ZEITEN: d.ZEITEN.map((z) => z.id === zId
+            ? { ...z, bis, dauer: (new Date(bis) - new Date(z.von)) / 3600000 } : z) }));
     } else {
       const id = crypto.randomUUID(), von = new Date().toISOString();
       const n = { betriebId: daten.betriebId, bId: baustelleId, profil: daten.meinProfil, id, von };
-      await merken("einstempeln", n, () =>
-        einstempeln(n.betriebId, baustelleId, n.profil, id, von));
+      await merken("einstempeln", n,
+        () => einstempeln(n.betriebId, baustelleId, n.profil, id, von),
+        (d) => ({ ...d,
+          laufend: { id, profil_id: d.meinProfil, baustelle_id: baustelleId, von, bis: null },
+          ZEITEN: [{ id, profil: d.meinProfil, bId: baustelleId, von, bis: null, dauer: null },
+                   ...d.ZEITEN] }));
     }
   };
 
   const berichtSchreiben = async (baustelleId, text) => {
     const id = crypto.randomUUID();
     const n = { betriebId: daten.betriebId, bId: baustelleId, text, profil: daten.meinProfil, id };
-    await merken("bericht", n, () =>
-      berichtSpeichern(n.betriebId, baustelleId, text, n.profil, id));
+    await merken("bericht", n,
+      () => berichtSpeichern(n.betriebId, baustelleId, text, n.profil, id),
+      (d) => ({ ...d, BERICHTE: [{ id, bId: baustelleId, profil: d.meinProfil,
+        datum: new Date().toISOString().slice(0, 10), text }, ...d.BERICHTE] }));
     return id;
   };
 
-  const zeileKorrigieren = async (id, felder) => { await zeileAendern(id, felder); await neuLaden(); };
-  const zeileWeg = async (id) => { await zeileLoeschen(id); await neuLaden(); };
+  /* Korrekturen gehen nicht ueber die Warteschlange — sie brauchen die
+     Antwort des Servers. Der Bildschirm zieht trotzdem sofort nach,
+     der Abgleich raeumt danach auf. */
+  const zeileKorrigieren = async (id, felder) => {
+    sofort((d) => ({ ...d, ZEILEN: d.ZEILEN.map((z) => z.id === id ? { ...z, ...felder } : z) }));
+    try { await zeileAendern(id, felder); abgleichen(); }
+    catch (e) { neuLaden(); throw e; }
+  };
+  const zeileWeg = async (id) => {
+    sofort((d) => ({ ...d, ZEILEN: d.ZEILEN.filter((z) => z.id !== id) }));
+    try { await zeileLoeschen(id); abgleichen(); }
+    catch (e) { neuLaden(); throw e; }
+  };
 
   const blattSichern = async (baustelleId, name, blob) => {
     const datei = new File([blob], "unterschrift.png", { type: "image/png" });

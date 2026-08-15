@@ -19,10 +19,40 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    /* Signatur der Release-Huelle.
+
+       Android bindet Aktualisierungen an die Signatur: eine App, die
+       mit einem anderen Schluessel gebaut wurde, ist fuer das System
+       eine andere App und laesst sich nicht darueber installieren.
+       Der Schluessel muss also derselbe bleiben, solange es die App
+       gibt — geht er verloren, kann niemand mehr aktualisieren.
+
+       Deshalb steht er NICHT im Verzeichnis. Vier Umgebungsvariablen
+       reichen ihn herein; fehlt eine, gibt es einfach keine
+       Release-Signatur und der Debug-Bau laeuft weiter wie bisher. */
+    def laden = System.getenv("FLUX_KEYSTORE")
+    def habenSchluessel = laden != null && !laden.isEmpty() && file(laden).exists()
+
+    signingConfigs {
+        if (habenSchluessel) {
+            freigabe {
+                storeFile file(laden)
+                storePassword System.getenv("FLUX_KEYSTORE_PASSWORT")
+                keyAlias System.getenv("FLUX_SCHLUESSEL")
+                keyPassword System.getenv("FLUX_SCHLUESSEL_PASSWORT")
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (habenSchluessel) {
+                signingConfig signingConfigs.freigabe
+            } else {
+                logger.lifecycle("FLUX: kein Schluessel gesetzt — die Release-Huelle bleibt unsigniert.")
+            }
         }
     }
 }

@@ -190,13 +190,14 @@ const euro = (n) => n == null ? "—" : n.toLocaleString("de-DE", { style:"curre
 /* ── Artikel ── */
 function Artikel({ zurueck, speichern, darfPreise }) {
   const { ARTIKEL } = useDaten();
-  const leer = { txt:"", eh:"St", lief:"", ek:"", vk:"" };
+  const leer = { txt:"", eh:"St", lief:"", ean:"", ek:"", vk:"" };
   const [f, setF] = useState(leer);
   return (
     <Maske titel="Artikelstamm" unter="Was angefordert werden kann."
       zurueck={zurueck} eintraege={ARTIKEL} leeren={() => setF(leer)}
       gueltig={!!f.txt.trim()} speichern={(id) => speichern(f, id)}
       laden={(a) => setF({ txt:a.txt, eh:a.eh, lief:a.lief === "—" ? "" : (a.lief ?? ""),
+                           ean: a.ean ?? "",
                            ek: a.ek == null ? "" : String(a.ek).replace(".", ","),
                            vk: a.vk == null ? "" : String(a.vk).replace(".", ",") })}
       zeile={(a) => (
@@ -214,6 +215,9 @@ function Artikel({ zurueck, speichern, darfPreise }) {
         <Auswahl label="Einheit" wert={f.eh} setzen={(v) => setF({ ...f, eh:v })} werte={EINHEITEN} />
         <Feld label="Lieferant" value={f.lief} onChange={(e) => setF({ ...f, lief:e.target.value })}
           placeholder="Sonepar" />
+        <Feld label="Strichcode (EAN)" value={f.ean} inputMode="numeric"
+          onChange={(e) => setF({ ...f, ean:e.target.value.replace(/\D/g, "") })}
+          placeholder="4001234500017" />
         {darfPreise && <>
           <Feld label="Einkauf (netto)" value={f.ek} inputMode="decimal"
             onChange={(e) => setF({ ...f, ek:e.target.value })} placeholder="2,35" />

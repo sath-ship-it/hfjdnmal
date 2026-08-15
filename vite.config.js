@@ -6,9 +6,11 @@ import { VitePWA } from "vite-plugin-pwa";
    Die CI setzt BASE_PATH, damit derselbe Code an beiden Orten läuft. */
 const base = process.env.BASE_PATH || "/";
 
-/* Die App muss ihre eigene Fassung kennen, um sie mit der auf dem
-   Server zu vergleichen. Kommt beim Bauen herein. */
-const fassung = process.env.WARO_FASSUNG || "dev";
+/* Die Fassung steht in der App unter "Mehr". Ohne sie ist die Frage
+   "welche Fassung hast du drauf?" nicht zu beantworten — und genau die
+   steht am Anfang jeder Fehlersuche. Die CI reicht die Lauf-Nummer
+   durch, lokal steht "dev". */
+const fassung = process.env.FLUX_FASSUNG || process.env.WARO_FASSUNG || "dev";
 
 export default defineConfig({
   base,
