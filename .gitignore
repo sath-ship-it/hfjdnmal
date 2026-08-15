@@ -17,6 +17,10 @@ android/build
 android/app/build
 android/capacitor-cordova-android-plugins
 *.apk
+# ... ausser der ausgelieferten Huelle: Cloudflare Pages baut aus dem
+# Repo, was nicht drinliegt, kann es nicht ausliefern. Aendert sich
+# selten — die Oberflaeche kommt aus dem Netz, nicht aus der APK.
+!public/flux.apk
 *.keystore
 *.jks
 vorschau/
