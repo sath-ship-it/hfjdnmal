@@ -286,11 +286,24 @@ function Mitarbeiter({ zurueck, speichern }) {
   const { team } = useDaten();
   const leer = { name:"", kurz:"", rolle:"", zugang:"Monteur" };
   const [f, setF] = useState(leer);
+  /* Wer gerade bearbeitet wird — gebraucht fuer die Sperre unten. */
+  const [vorher, setVorher] = useState(null);
+
+  /* Die letzte Leitung darf sich nicht selbst herabstufen. Danach
+     koennte niemand mehr Zugaenge vergeben oder Baustellen anlegen,
+     und zurueck kaeme man nur ueber das SQL-Fenster in Supabase. Die
+     Datenbank laesst es zu — sie kennt die Absicht nicht — also hier. */
+  const letzteLeitung = vorher?.zugang === "Leitung"
+    && team.filter((m) => m.zugang === "Leitung").length <= 1;
+  const sperre = letzteLeitung && f.zugang !== "Leitung";
+
   return (
     <Maske titel="Mitarbeiter" unter="Wer im Betrieb ist. Zugänge kommen getrennt dazu."
-      zurueck={zurueck} eintraege={team} leeren={() => setF(leer)}
-      gueltig={!!f.name.trim() && !!f.kurz.trim()} speichern={(id) => speichern(f, id)}
-      laden={(m) => setF({ name:m.name, kurz:m.kurz, rolle:m.rolle ?? "", zugang:m.zugang })}
+      zurueck={zurueck} eintraege={team}
+      leeren={() => { setF(leer); setVorher(null); }}
+      gueltig={!!f.name.trim() && !!f.kurz.trim() && !sperre}
+      speichern={(id) => speichern(f, id)}
+      laden={(m) => { setVorher(m); setF({ name:m.name, kurz:m.kurz, rolle:m.rolle ?? "", zugang:m.zugang }); }}
       zeile={(m) => (<>
         <span className="wr-av">{m.kurz}</span>
         <div style={{ flex:1, minWidth:0 }}>
@@ -305,10 +318,17 @@ function Mitarbeiter({ zurueck, speichern }) {
         <Feld label="Funktion" value={f.rolle} onChange={(e) => setF({ ...f, rolle:e.target.value })}
           placeholder="TM, ME, HA …" />
         <Auswahl label="Zugang" wert={f.zugang} setzen={(v) => setF({ ...f, zugang:v })}
-          werte={["Monteur", "Azubi", "Leitung"]} />
+          werte={["Monteur", "Azubi", "Buchhalter", "Leitung"]} />
+        {sperre && (
+          <div className="wr-fehler" role="alert">
+            <AlertTriangle size={15} />
+            Das ist die letzte Leitung. Erst jemand anderem die Leitung geben.
+          </div>
+        )}
         <p className="wr-hint">
-          Legt den Mitarbeiter an, noch ohne Anmeldung. Das Anmeldekonto
-          vergibt bisher das Büro in Supabase.
+          {vorher
+            ? "Der Zugang wirkt sofort — die Datenbank entscheidet danach, was diese Person zu sehen bekommt."
+            : "Legt den Mitarbeiter an, noch ohne Anmeldung. Das Anmeldekonto vergibt das Büro in Supabase."}
         </p>
       </>} />
   );
