@@ -1393,6 +1393,20 @@ export default function App() {
      enthalten, und die gehen ihn nichts an. */
   useEffect(() => { setOffen(wer ? schlangeMeine(wer).length : 0); }, [wer]);
 
+  /* Gebuendeltes Nachladen nach dem Schreiben. Steht hier oben bei den
+     anderen Hooks und NICHT unten bei merken(), wo es hingehoerte:
+     unter den Zustaenden vor der App wird frueh zurueckgegeben, und
+     ein Hook dahinter laeuft nur in manchen Durchgaengen. React zaehlt
+     sie aber und bricht ab, sobald die Zahl sich aendert — der
+     Bildschirm bleibt schwarz. Genau das war hier passiert. */
+  const abgleichUhr = useRef(null);
+  const abgleichen = useCallback(() => {
+    clearTimeout(abgleichUhr.current);
+    abgleichUhr.current = setTimeout(() => { neuLaden(); }, 1500);
+  }, [neuLaden]);
+
+  useEffect(() => () => clearTimeout(abgleichUhr.current), []);
+
   /* Tickt nur, solange eine Stempelung läuft. */
   useEffect(() => {
     if (!daten?.laufend) return;
@@ -1458,14 +1472,6 @@ export default function App() {
   const sofort = (aendern) => setDaten((d) => (d ? aendern(d) : d));
   /* Muss zur Darstellung aus der Datenschicht passen: "15.08." */
   const kurzDatum = () => new Date().toLocaleDateString("de-DE", { day:"2-digit", month:"2-digit" }) + "";
-
-  const abgleichUhr = useRef(null);
-  const abgleichen = useCallback(() => {
-    clearTimeout(abgleichUhr.current);
-    abgleichUhr.current = setTimeout(() => { neuLaden(); }, 1500);
-  }, [neuLaden]);
-
-  useEffect(() => () => clearTimeout(abgleichUhr.current), []);
 
   const merken = async (art, n, tun, jetztSchon) => {
     if (jetztSchon) sofort(jetztSchon);

@@ -29,6 +29,14 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+
+      # Hooks hinter einer fruehen Rueckgabe sieht man dem Code an, nicht
+      # dem Bild: der Rauchtest kommt nie ueber den Anmeldebildschirm
+      # hinaus und bliebe gruen, waehrend die App nach der Anmeldung
+      # schwarz ist. Deshalb hier, vor allem anderen.
+      - name: Hook-Regeln pruefen
+        run: npm run pruefen
+
       - name: Bauen
         # Cloudflare Pages liefert im Wurzelverzeichnis aus, daher "/".
         # Die Fassung steht danach in der App unter "Mehr".
