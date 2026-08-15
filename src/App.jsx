@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   Home, HardHat, Plus, Package, MoreHorizontal, Search, ChevronLeft, ChevronRight,
-  Phone, MapPin, Mic, Camera, Clock, Play, Square, X, Lock, AlertTriangle,
+  Phone, MapPin, Mic, Camera, Clock, Play, Square, X, Lock, AlertTriangle, Receipt,
   Building2, Check, Ruler, FileText, Truck, Send, PenLine, Zap, Download, WifiOff, Loader
 } from "lucide-react";
 import Aktualisierung from "./Aktualisierung.jsx";
 import Login from "./Login.jsx";
 import FotoKnopf from "./Foto.jsx";
 import Aufmassblatt from "./Aufmassblatt.jsx";
+import Abrechnung from "./Abrechnung.jsx";
+import { zahl, euro } from "./format.js";
 import Stammdaten from "./Stammdaten.jsx";
 import { Stunden, Berichte, Fotos } from "./Ansichten.jsx";
 import { useOnline, vorWie, schlangeLesen, schlangeAbarbeiten } from "./offline.js";
@@ -57,9 +59,14 @@ export
 function baueDaten(d) {
   const M = (id) => d.team.find((t) => t.id === id) ?? { name:"—", kurz:"??", rolle:"", zugang:"Monteur" };
   const A = (id) => d.ARTIKEL.find((x) => x.id === id) ?? { txt:"Unbekannter Artikel", eh:"", lief:"—" };
-  /* Die Leitung sieht alles, was ankommt; für andere zeigen wir nur die
-     eigenen Baustellen. Fremde kämen ohnehin nicht durch die Regeln. */
-  const sichtbar = (u) => rechte(u).leitung ? d.B : d.B.filter((b) => b.crew.includes(u.id));
+  /* Leitung und Buchhaltung sehen alles, was ankommt; für Monteure nur
+     die eigenen Baustellen. Fremde kämen ohnehin nicht durch die Regeln.
+     Wichtig für die Buchhaltung: sie steht in keiner Crew, bekäme hier
+     also eine leere Liste, obwohl die Datenbank alles liefert. */
+  const sichtbar = (u) => {
+    const r = rechte(u);
+    return r.leitung || r.preise ? d.B : d.B.filter((b) => b.crew.includes(u.id));
+  };
   return { ...d, M, A, sichtbar };
 }
 
@@ -72,9 +79,6 @@ function rechne(s) {
     sum + term.split("*").reduce((p, n) => p * (parseFloat(n) || 0), 1), 0);
   return isFinite(v) ? Math.round(v * 100) / 100 : null;
 }
-const zahl = (n) => n.toLocaleString("de-DE", { maximumFractionDigits: 2 });
-const euro = (n) => n == null ? "—"
-  : n.toLocaleString("de-DE", { style:"currency", currency:"EUR" });
 
 /* ── Bausteine ───────────────────────────────────────────── */
 const Stripe = ({ phase, ruht }) => {
@@ -861,7 +865,7 @@ function Baustellen({ u, go }) {
           <Stripe phase={b.phase} ruht={b.ruht} />
           <div className="wr-card-in">
             <div className="wr-row"><span className="wr-card-t">{b.name}</span><span className="wr-mono-s">{b.nr}</span></div>
-            <div className="wr-card-s">{rechte(u).leitung ? b.kunde : b.adr}</div>
+            <div className="wr-card-s">{rechte(u).preise ? b.kunde : b.adr}</div>
             <div className="wr-card-meta">
               <span className="wr-tag" style={{ color:PHASE[b.phase].c,
                       borderColor:`color-mix(in srgb, ${PHASE[b.phase].c} 40%, transparent)` }}>
@@ -896,12 +900,19 @@ function Mehr({ u, abmelden, betrieb, neuLaden, stamm, zeige }) {
       </div>
       <button className="wr-order" onClick={abmelden}>Abmelden</button>
       <button className="wr-order" onClick={neuLaden}>Daten neu laden</button>
-      {rechte(u).leitung && (
+      {/* Erfasstes und Stammdaten gehoeren auch der Buchhaltung: daraus
+          werden die Rechnungen. Was sie NICHT darf — Zugaenge vergeben,
+          Baustellen und Mitarbeiter anlegen — sperrt Stammdaten selbst
+          anhand von darf.leitung, nicht dieser Knopf hier. */}
+      {(rechte(u).leitung || rechte(u).preise) && (
         <>
           <Eyebrow>Erfasstes ansehen</Eyebrow>
       {[{ I:Clock, t:"Stunden", s:`${ZEITEN.length} Stempelungen`, k:"stunden" },
         { I:FileText, t:"Tagesberichte", s:`${BERICHTE.length} Berichte`, k:"berichte" },
-        { I:Camera, t:"Fotos", s:`${FOTOS.length} Aufnahmen`, k:"fotos" }].map(({ I, t, s, k }) => (
+        { I:Camera, t:"Fotos", s:`${FOTOS.length} Aufnahmen`, k:"fotos" }]
+        /* Die Buchhaltung hat Stunden schon als eigenen Reiter. */
+        .filter(({ k }) => !(k === "stunden" && !rechte(u).leitung))
+        .map(({ I, t, s, k }) => (
         <button key={k} className="wr-task" style={{ cursor:"pointer" }} onClick={() => zeige(k)}>
           <span className="wr-icon"><I size={15} /></span>
           <div style={{ flex:1, textAlign:"left" }}>
@@ -1101,6 +1112,21 @@ export const STIL = `
   font-weight:600;font-size:10px;cursor:pointer;flex:none;}
 .wr-photo{width:66px;height:66px;border-radius:10px;flex:none;background:linear-gradient(135deg,var(--ph1),var(--ph2));}
 .wr-hint{font-size:11.5px;color:var(--m);line-height:1.45;margin:10px 2px 0;}
+/* Abrechnung: Summenband und die drei Kennzahlen je Baustelle. */
+.wr-summe{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 14px 10px;
+  padding:12px 14px;background:var(--fz);border-radius:11px;}
+.wr-summe-l{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--m);}
+.wr-summe-z{font-family:'Archivo',sans-serif;font-weight:800;font-size:19px;letter-spacing:-.02em;
+  white-space:nowrap;}
+.wr-summe-warn,.wr-abr-warn{display:flex;align-items:center;gap:5px;color:var(--rot);font-size:11.5px;margin-top:4px;}
+.wr-summe-warn svg,.wr-abr-warn svg{flex:none}
+.wr-abr{display:flex;gap:4px;margin-top:10px;}
+.wr-abr span{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;padding:7px 8px;
+  background:var(--g);border-radius:8px;}
+.wr-abr b{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:11.5px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.wr-abr small{font-size:9.5px;color:var(--m);text-transform:uppercase;letter-spacing:.06em;}
 .wr-empty{text-align:center;color:var(--m);font-size:13px;line-height:1.6;padding:28px 24px;}
 .wr-blatt{background:#fff;color:#14181B;margin:0 14px;border:1px solid var(--h);border-radius:11px;padding:16px;}
 .wr-blatt-kopf{display:flex;justify-content:space-between;gap:12px;border-bottom:2px solid #14181B;padding-bottom:10px;}
@@ -1350,11 +1376,20 @@ export default function App() {
     await neuLaden();
   };
 
-  const nav = [
-    { k:"heute", l:"Heute", I:Home }, { k:"bau", l:"Baustellen", I:HardHat },
-    { k:"erf", l:"Erfassen", I:Plus }, { k:"mat", l:"Material", I:Package },
-    { k:"mehr", l:"Mehr", I:MoreHorizontal },
-  ];
+  /* Die Buchhaltung bekommt eine andere Leiste, nicht dieselbe mit
+     gesperrten Knoepfen. Sie stempelt nicht ein, erfasst kein Aufmass
+     und faehrt auf keine Baustelle — ihr Einstieg ist die Frage, was
+     abgerechnet werden kann. Material bleibt, denn Bestellen ist
+     Bueroarbeit. */
+  const nurBuch = rechte(u).preise && !rechte(u).leitung;
+  const nav = nurBuch
+    ? [{ k:"abr", l:"Abrechnung", I:Receipt }, { k:"stunden", l:"Stunden", I:Clock },
+       { k:"mat", l:"Material", I:Package }, { k:"mehr", l:"Mehr", I:MoreHorizontal }]
+    : [{ k:"heute", l:"Heute", I:Home }, { k:"bau", l:"Baustellen", I:HardHat },
+       { k:"erf", l:"Erfassen", I:Plus }, { k:"mat", l:"Material", I:Package },
+       { k:"mehr", l:"Mehr", I:MoreHorizontal }];
+
+  const aktiv = nav.some((n) => n.k === tab) ? tab : nav[0].k;
 
   return (
     <div className="wr-root">
@@ -1384,16 +1419,22 @@ export default function App() {
           </div>
         )}
 
-        {tab === "heute" && <Heute u={u} anf={daten.anf} laufend={daten.laufend} stempeln={stempeln}
+        {aktiv === "heute" && <Heute u={u} anf={daten.anf} laufend={daten.laufend} stempeln={stempeln}
           kannZeit={daten.koennen.zeit}
           sek={daten.laufend ? Math.max(0, Math.floor((jetzt - new Date(daten.laufend.von).getTime()) / 1000)) : 0}
           go={(id) => { setDetail(id); setTab("bau"); }} toMat={() => setTab("mat")} />}
 
-        {tab === "bau" && (detail
+        {aktiv === "abr" && (detail
+          ? <Detail u={u} id={detail} back={() => setDetail(null)} zeilen={daten.ZEILEN} anf={daten.anf} />
+          : <Abrechnung u={u} oeffne={(id) => setDetail(id)} />)}
+
+        {aktiv === "stunden" && <Stunden u={u} />}
+
+        {aktiv === "bau" && (detail
           ? <Detail u={u} id={detail} back={() => setDetail(null)} zeilen={daten.ZEILEN} anf={daten.anf} />
           : <Baustellen u={u} go={(id) => setDetail(id)} />)}
 
-        {tab === "erf" && (
+        {aktiv === "erf" && (
           erf === null ? <Erfassen u={u} pick={setErf} />
           : erf === "bericht" ? <Bericht u={u} back={() => setErf(null)} speichern={berichtSchreiben} fotoZu={fotoZu} />
           : erf === "aufmass" ? <Aufmass u={u} zeilen={daten.ZEILEN} speichern={zeileSpeichern} fotoZu={fotoZu} blattSichern={blattSichern}
@@ -1401,10 +1442,10 @@ export default function App() {
           : <Anfordern u={u} back={() => setErf(null)} senden={senden} />
         )}
 
-        {tab === "mat" && <Material u={u} anf={daten.anf} bestellenBei={bestellenBei}
+        {aktiv === "mat" && <Material u={u} anf={daten.anf} bestellenBei={bestellenBei}
           toAnf={() => { setTab("erf"); setErf("anford"); }} />}
 
-        {tab === "mehr" && (
+        {aktiv === "mehr" && (
           stamm ? <Stammdaten zurueck={() => setStamm(false)} ops={stammOps} darf={rechte(u)} />
           : ansicht === "stunden"  ? <Stunden  u={u} zurueck={() => setAnsicht(null)} />
           : ansicht === "berichte" ? <Berichte zurueck={() => setAnsicht(null)} />
@@ -1416,17 +1457,17 @@ export default function App() {
 
         <nav className="wr-nav">
           {nav.map(({ k, l, I }) => (
-            <button key={k} className={tab === k ? "on" : ""}
+            <button key={k} className={aktiv === k ? "on" : ""}
               onClick={() => {
                 /* Nochmal auf den schon aktiven Reiter tippen führt zurück
                    an dessen Anfang — sonst sitzt man in einem
                    Unterbildschirm fest und der Knopf scheint tot. */
-                if (tab === k) { setDetail(null); setErf(null); }
+                if (aktiv === k) { setDetail(null); setErf(null); }
                 setTab(k);
-                if (k !== "bau") setDetail(null);
+                if (k !== "bau" && k !== "abr") setDetail(null);
                 if (k !== "erf") setErf(null);
               }}>
-              <I size={20} strokeWidth={tab === k ? 2.3 : 1.8} />
+              <I size={20} strokeWidth={aktiv === k ? 2.3 : 1.8} />
               <span>{l}</span>
             </button>
           ))}

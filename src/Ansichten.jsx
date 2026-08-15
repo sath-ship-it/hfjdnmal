@@ -27,8 +27,12 @@ const wochenStart = (d = new Date()) => {
 /* ── Stunden ── */
 export function Stunden({ zurueck, u }) {
   const { ZEITEN, B, M } = useDaten();
-  const [wer, setWer] = useState("ich");
+  /* Wer den ganzen Betrieb sehen darf: die Leitung und die Buchhaltung.
+     Fuer die Buchhaltung ist "meine Stunden" allerdings sinnlos — sie
+     stempelt nicht ein — deshalb faengt sie beim Betrieb an. */
   const leitung = u.zugang === "Leitung";
+  const alleSehen = leitung || u.zugang === "Buchhalter";
+  const [wer, setWer] = useState(leitung ? "ich" : alleSehen ? "alle" : "ich");
 
   const ab = wochenStart().getTime();
   const dieseWoche = ZEITEN.filter((z) => new Date(z.von).getTime() >= ab
@@ -46,12 +50,16 @@ export function Stunden({ zurueck, u }) {
   return (
     <div className="wr-scroll">
       <div className="wr-sheethead">
-        <button className="wr-back2" onClick={zurueck}><ChevronLeft size={18} /> Zurück</button>
+        {/* Als eigener Reiter gibt es kein "zurueck" — dann auch keinen
+            Knopf, der ins Leere fuehrt. */}
+        {zurueck && (
+          <button className="wr-back2" onClick={zurueck}><ChevronLeft size={18} /> Zurück</button>
+        )}
         <h1 className="wr-hero-h" style={{ marginTop:14 }}>Stunden</h1>
         <p className="wr-sub">Diese Woche ab {wochenStart().toLocaleDateString("de-DE")}</p>
       </div>
 
-      {leitung && (
+      {alleSehen && (
         <div className="wr-seg">
           {[["ich","Meine"],["alle","Ganzer Betrieb"]].map(([k, l]) => (
             <button key={k} onClick={() => setWer(k)} className="wr-segb"
