@@ -12,7 +12,7 @@ import Abrechnung from "./Abrechnung.jsx";
 import { zahl, euro } from "./format.js";
 import Stammdaten from "./Stammdaten.jsx";
 import { Stunden, Berichte, Fotos } from "./Ansichten.jsx";
-import { useOnline, vorWie, schlangeLesen, schlangeAbarbeiten } from "./offline.js";
+import { useOnline, vorWie, schlangeMeine, schlangeAbarbeiten, standLoeschen } from "./offline.js";
 import { supabase } from "./supabase.js";
 import { ladenMitCache, schreibenOderMerken, vorgangAusfuehren, zeileAendern, zeileLoeschen, anforderungSenden, aufmassSpeichern, bestellen,
   einstempeln, ausstempeln, berichtSpeichern, fotoHochladen, blattSpeichern,
@@ -1219,7 +1219,7 @@ export default function App() {
   const [ladefehler, setLadefehler] = useState("");
   const [ausCache, setAusCache] = useState(false);
   const [stand, setStand] = useState(0);
-  const [offen, setOffen] = useState(() => schlangeLesen().length);
+  const [offen, setOffen] = useState(0);
   const [verworfen, setVerworfen] = useState([]);
   const [tab, setTab] = useState("heute");
   const [erf, setErf] = useState(null);
@@ -1238,25 +1238,30 @@ export default function App() {
     return () => abo.subscription.unsubscribe();
   }, []);
 
+  /* Alles, was im Geraet liegt, haengt an diesem Schluessel: der
+     gespeicherte Stand und die Warteschlange. Auf einem geteilten
+     Baustellentelefon meldet sich nacheinander mehr als einer an. */
+  const wer = sitzung?.user?.id ?? null;
+
   const neuLaden = useCallback(async () => {
     setLadefehler("");
     try {
-      const { daten: d, ausCache: c, stand: st } = await ladenMitCache();
+      const { daten: d, ausCache: c, stand: st } = await ladenMitCache(wer);
       setDaten(d); setAusCache(c); setStand(st);
     } catch (e) { setLadefehler(e.message || String(e)); }
-  }, []);
+  }, [wer]);
 
   /* Gemerkte Vorgaenge nachreichen, sobald wieder Netz da ist. */
   const nachreichen = useCallback(async () => {
-    if (schlangeLesen().length === 0) return;
-    const { gesendet, verworfen } = await schlangeAbarbeiten(vorgangAusfuehren);
-    setOffen(schlangeLesen().length);
+    if (!wer || schlangeMeine(wer).length === 0) return;
+    const { gesendet, verworfen } = await schlangeAbarbeiten(vorgangAusfuehren, wer);
+    setOffen(schlangeMeine(wer).length);
     if (verworfen.length) setVerworfen(verworfen);
     if (gesendet > 0) {
-      const { daten: d, ausCache: c, stand: st } = await ladenMitCache();
+      const { daten: d, ausCache: c, stand: st } = await ladenMitCache(wer);
       setDaten(d); setAusCache(c); setStand(st);
     }
-  }, []);
+  }, [wer]);
 
   /* Sobald wieder Netz da ist, gemerkte Vorgaenge nachreichen. Steht
      bewusst HINTER der Definition: als const ist nachreichen vorher
@@ -1269,6 +1274,11 @@ export default function App() {
     neuLaden();
   }, [sitzung, neuLaden]);
 
+  /* Wieviel wartet fuer den gerade Angemeldeten. Beim Start und nach
+     jedem Kontowechsel neu — die Schlange kann Eintraege anderer
+     enthalten, und die gehen ihn nichts an. */
+  useEffect(() => { setOffen(wer ? schlangeMeine(wer).length : 0); }, [wer]);
+
   /* Tickt nur, solange eine Stempelung läuft. */
   useEffect(() => {
     if (!daten?.laufend) return;
@@ -1277,7 +1287,13 @@ export default function App() {
   }, [daten?.laufend]);
 
   const abmelden = async () => {
+    /* Den gespeicherten Stand mitnehmen: sonst laege er weiter im
+       Geraet, und wer sich als Naechstes anmeldet, saehe ihn im
+       naechsten Funkloch. Die Warteschlange bleibt — darin steckt
+       ungesendete Arbeit, die dem Abgemeldeten gehoert. */
+    standLoeschen();
     await supabase.auth.signOut();
+    setDaten(null);
     setTab("heute"); setDetail(null); setErf(null);
   };
 
@@ -1311,8 +1327,8 @@ export default function App() {
      nicht am Netz, wandert der Vorgang mit genau diesen Nummern in die
      Warteschlange — ein zweiter Versuch erzeugt dann kein Doppel. */
   const merken = async (art, n, tun) => {
-    const { gesendet } = await schreibenOderMerken(art, n, tun);
-    setOffen(schlangeLesen().length);
+    const { gesendet } = await schreibenOderMerken(art, n, tun, wer);
+    setOffen(schlangeMeine(wer).length);
     if (gesendet) await neuLaden();
     return gesendet;
   };

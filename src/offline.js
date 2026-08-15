@@ -43,20 +43,33 @@ export const istNetzfehler = (e) => {
     || t.includes("load failed") || t.includes("network request failed");
 };
 
-/* ── Letzter Stand ── */
-export function standSichern(daten) {
+/* ── Letzter Stand ──
+
+   Der Stand haengt am Konto, nicht am Geraet. Auf einem Baustellen-
+   telefon melden sich mehrere Leute nacheinander an, und der Stand
+   der Buchhaltung enthaelt Preise und Kundennamen — genau das, was
+   die Datenbank einem Monteur nie schicken wuerde. Ohne die Bindung
+   an "wer" bekaeme er sie beim naechsten Funkloch trotzdem zu sehen,
+   weil dann der gespeicherte Stand einspringt. */
+export function standSichern(daten, wer) {
   try {
-    localStorage.setItem(CACHE, JSON.stringify({ zeitpunkt: Date.now(), daten }));
+    localStorage.setItem(CACHE, JSON.stringify({ wer: wer ?? null, zeitpunkt: Date.now(), daten }));
   } catch { /* Speicher voll — dann eben ohne Gedaechtnis */ }
 }
 
-export function standLesen() {
+export function standLesen(wer) {
   try {
     const roh = localStorage.getItem(CACHE);
     if (!roh) return null;
-    const { zeitpunkt, daten } = JSON.parse(roh);
+    const { wer: gehoert, zeitpunkt, daten } = JSON.parse(roh);
+    /* Fremder Stand: lieber nichts zeigen als das Falsche. */
+    if ((gehoert ?? null) !== (wer ?? null)) return null;
     return { zeitpunkt, daten };
   } catch { return null; }
+}
+
+export function standLoeschen() {
+  try { localStorage.removeItem(CACHE); } catch { /* egal */ }
 }
 
 /* ── Warteschlange ── */
@@ -69,11 +82,21 @@ function schlangeSchreiben(liste) {
   try { localStorage.setItem(SCHLANGE, JSON.stringify(liste)); } catch { /* egal */ }
 }
 
-export function einreihen(art, nutzlast) {
-  const eintrag = { id: crypto.randomUUID(), art, nutzlast, zeitpunkt: Date.now() };
+/* Auch die Schlange gehoert einem Konto. Die Eintraege tragen fremde
+   Profil-Nummern in sich; unter einer anderen Anmeldung nachgereicht,
+   wiese die Datenbank sie zurecht ab — und sie flogen als dauerhaft
+   gescheitert raus. Die Arbeit waere weg. Deshalb bleiben fremde
+   Eintraege liegen, bis der Richtige sich wieder anmeldet. */
+export function einreihen(art, nutzlast, wer) {
+  const eintrag = { id: crypto.randomUUID(), wer: wer ?? null, art, nutzlast, zeitpunkt: Date.now() };
   schlangeSchreiben([...schlangeLesen(), eintrag]);
   return eintrag;
 }
+
+/* Wieviel wartet fuer DIESES Konto — das ist die Zahl, die dem
+   Angemeldeten etwas sagt. */
+export const schlangeMeine = (wer) =>
+  schlangeLesen().filter((e) => (e.wer ?? null) === (wer ?? null));
 
 /* Arbeitet die Warteschlange ab. "ausfuehren" bekommt art und Nutzlast
    und wirft, wenn es nicht klappt.
@@ -81,8 +104,11 @@ export function einreihen(art, nutzlast) {
    Ein Eintrag, der aus einem anderen Grund als fehlendem Netz scheitert
    (etwa geloeschte Baustelle), wuerde die Schlange sonst fuer immer
    blockieren. Solche Eintraege fliegen raus und werden gemeldet. */
-export async function schlangeAbarbeiten(ausfuehren) {
-  const offen = schlangeLesen();
+export async function schlangeAbarbeiten(ausfuehren, wer) {
+  const alle = schlangeLesen();
+  const offen = alle.filter((e) => (e.wer ?? null) === (wer ?? null));
+  /* Fremde Eintraege ruehren wir nicht an, sie warten auf ihr Konto. */
+  const fremd = alle.filter((e) => (e.wer ?? null) !== (wer ?? null));
   if (offen.length === 0) return { gesendet: 0, verworfen: [] };
 
   const bleibt = [], verworfen = [];
@@ -95,7 +121,7 @@ export async function schlangeAbarbeiten(ausfuehren) {
       else verworfen.push({ ...e, grund: fehler.message || String(fehler) });
     }
   }
-  schlangeSchreiben(bleibt);
+  schlangeSchreiben([...fremd, ...bleibt]);
   return { gesendet, verworfen };
 }
 

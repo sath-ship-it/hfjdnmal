@@ -431,14 +431,14 @@ export async function fotoAdressen(pfade, sekunden = 3600) {
    Klappt es, wird der Stand gesichert. Klappt es nicht und es liegt am
    Netz, zeigen wir den letzten Stand — gekennzeichnet, damit niemand
    alte Zahlen für aktuell hält. */
-export async function ladenMitCache() {
+export async function ladenMitCache(wer) {
   try {
     const daten = await ladeAlles();
-    standSichern(daten);
+    standSichern(daten, wer);
     return { daten, ausCache: false, stand: Date.now() };
   } catch (e) {
     if (!istNetzfehler(e)) throw e;
-    const alt = standLesen();
+    const alt = standLesen(wer);
     if (!alt) throw new Error("Kein Netz und noch kein Stand im Gerät. Einmal mit Netz öffnen.");
     return { daten: alt.daten, ausCache: true, stand: alt.zeitpunkt };
   }
@@ -449,11 +449,11 @@ export async function ladenMitCache() {
    Warteschlange und wird später nachgereicht. Alles hier ist ein
    Einfügen mit vom Gerät vergebener Nummer — ein zweiter Versuch
    erzeugt deshalb kein Doppel. */
-export async function schreibenOderMerken(art, nutzlast, ausfuehren) {
+export async function schreibenOderMerken(art, nutzlast, ausfuehren, wer) {
   try { await ausfuehren(); return { gesendet: true }; }
   catch (e) {
     if (!istNetzfehler(e)) throw e;
-    einreihen(art, nutzlast);
+    einreihen(art, nutzlast, wer);
     return { gesendet: false };
   }
 }
