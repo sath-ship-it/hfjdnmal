@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Home, HardHat, Plus, Package, MoreHorizontal, Search, ChevronLeft, ChevronRight,
-  Phone, MapPin, Mic, Camera, Clock, Play, Square, X, Lock, AlertTriangle, Receipt,
+  Phone, MapPin, Mic, Camera, Clock, Play, Square, Coffee, X, Lock, AlertTriangle, Receipt,
   Building2, Check, Ruler, FileText, Truck, Send, PenLine, Zap, Download, WifiOff, Loader
 } from "lucide-react";
 import Aktualisierung from "./Aktualisierung.jsx";
@@ -115,17 +115,23 @@ const Hinweis = ({ children }) => (
 );
 
 /* ── Heute ───────────────────────────────────────────────── */
-function Heute({ u, anf, go, laufend, stempeln, sek, toMat, kannZeit }) {
-  const { M, sichtbar } = useDaten();
+function Heute({ u, anf, go, laufend, stempeln, pausieren, sek, toMat, kannZeit, kannPause }) {
+  const { M, sichtbar, koennen } = useDaten();
   const [sendet, setSendet] = useState(false);
   const [fehler, setFehler] = useState("");
+  const [gewaehlt, setGewaehlt] = useState("");
   const r = rechte(u);
   const mein = sichtbar(u);
-  /* Läuft die Uhr, gilt die Baustelle aus der Stempelung — sonst die,
-     auf der man heute eingeteilt ist. */
-  const aktiv = (laufend && mein.find((b) => b.id === laufend.baustelle_id))
-    || mein.find((b) => b.heute.includes(u.id)) || mein[0];
   const laeuft = !!laufend;
+  const pausiert = laeuft && (laufend.art ?? "Arbeit") === "Pause";
+
+  /* Läuft die Uhr, gilt die Baustelle aus der Stempelung. Sonst muss
+     eine gewählt werden — bewusst ohne Vorgabe. Vorher nahm die App
+     einfach die erste aus der Liste, und wer nicht hinsah, buchte
+     seinen Tag auf die falsche Baustelle. Das faellt erst bei der
+     Abrechnung auf, und dann ist es Nacharbeit. */
+  const laufendeBs = laeuft ? mein.find((b) => b.id === laufend.baustelle_id) : null;
+  const aktiv = laufendeBs || mein.find((b) => b.id === gewaehlt) || null;
   const zeit = `${String(Math.floor(sek/3600)).padStart(2,"0")}:${String(Math.floor(sek%3600/60)).padStart(2,"0")}:${String(sek%60).padStart(2,"0")}`;
   const offen = anf.filter((x) => x.status === "Angefordert");
   const dringend = offen.filter((x) => x.dringend);
@@ -135,31 +141,67 @@ function Heute({ u, anf, go, laufend, stempeln, sek, toMat, kannZeit }) {
       <div className="wr-hero">
         <div className="wr-hero-date">Freitag · 14. August 2026 · KW 33</div>
         <h1 className="wr-hero-h">Moin, {u.name.split(" ")[0]}</h1>
-        <div className="wr-task-s" style={{ marginTop:4 }}>{u.zugang}</div>
       </div>
 
-      {aktiv && (
+      {mein.length > 0 && (
         <div className="wr-clock" style={{ borderColor: laeuft ? C.signal : C.hair }}>
           <div className="wr-clock-top">
             <div style={{ minWidth:0 }}>
-              <div className="wr-clock-lbl">{laeuft ? "Läuft auf" : "Nicht eingestempelt"}</div>
-              <div className="wr-clock-bs">{aktiv.name}</div>
-              <div className="wr-clock-nr">{aktiv.nr}</div>
+              <div className="wr-clock-lbl">
+                {pausiert ? "Pause läuft auf" : laeuft ? "Läuft auf" : "Nicht eingestempelt"}
+              </div>
+              <div className="wr-clock-bs">{aktiv ? aktiv.name : "Keine Baustelle gewählt"}</div>
+              <div className="wr-clock-nr">{aktiv ? aktiv.nr : "—"}</div>
             </div>
-            <div className="wr-clock-time" style={{ color: laeuft ? C.ink : C.mute }}>{zeit}</div>
+            <div className="wr-clock-time" style={{ color: laeuft ? "var(--i)" : "var(--m)" }}>{zeit}</div>
           </div>
-          <button className="wr-btn-big" disabled={sendet || !kannZeit}
+
+          {!laeuft && (
+            <div className="wr-select" style={{ marginBottom:10 }}>
+              <select value={gewaehlt} onChange={(e) => setGewaehlt(e.target.value)}
+                aria-label="Baustelle für die Stempelung">
+                <option value="">Baustelle wählen …</option>
+                {mein.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}{b.heute.includes(u.id) ? " · heute eingeteilt" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <button className="wr-btn-big" disabled={sendet || !kannZeit || (!laeuft && !aktiv)}
             onClick={async () => {
               setSendet(true); setFehler("");
-              try { await stempeln(aktiv.id); }
+              try { await stempeln(aktiv?.id); setGewaehlt(""); }
               catch (e) { setFehler(e.message); }
               finally { setSendet(false); }
             }}
-            style={{ background: !kannZeit ? "var(--f)" : laeuft ? "var(--i)" : C.signal,
-                     color: !kannZeit ? "var(--m)" : laeuft ? "var(--ai)" : C.ink }}>
+            style={{ background: !kannZeit || (!laeuft && !aktiv) ? "var(--f)" : laeuft ? "var(--i)" : C.signal,
+                     color: !kannZeit || (!laeuft && !aktiv) ? "var(--m)" : laeuft ? "var(--ai)" : C.ink }}>
             {laeuft ? <Square size={17} fill="currentColor" /> : <Play size={17} fill="currentColor" />}
             {sendet ? "Moment …" : laeuft ? "Feierabend" : "Einstempeln"}
           </button>
+
+          {laeuft && kannPause && (
+            <button className="wr-order" style={{ width:"100%", margin:"8px 0 0" }}
+              disabled={sendet}
+              onClick={async () => {
+                setSendet(true); setFehler("");
+                try { await pausieren(); }
+                catch (e) { setFehler(e.message); }
+                finally { setSendet(false); }
+              }}>
+              {pausiert
+                ? <><Play size={15} fill="currentColor" /> Weiterarbeiten</>
+                : <><Coffee size={15} /> Pause</>}
+            </button>
+          )}
+          {laeuft && !kannPause && koennen.zeit && (
+            <p className="wr-hint" style={{ margin:"8px 0 0" }}>
+              Pause stempeln geht erst mit Nachtrag 0006.
+            </p>
+          )}
           {!kannZeit && <p className="wr-hint" style={{ margin:"8px 0 0" }}>
             Zeiterfassung ist noch nicht eingerichtet. Die Leitung muss Nachtrag 0002 einspielen.
           </p>}
@@ -879,7 +921,7 @@ function Detail({ u, id, back, zeilen, anf }) {
       <div className="wr-tabs">
         {["Übersicht", "Aufmaß", "Material"].map((t) => (
           <button key={t} onClick={() => setTab(t)} className="wr-tab"
-            style={tab === t ? { color:C.ink, borderBottomColor:C.signal } : {}}>{t}</button>
+            style={tab === t ? { color:"var(--i)", borderBottomColor:C.signal } : {}}>{t}</button>
         ))}
       </div>
 
@@ -1516,6 +1558,34 @@ export default function App() {
 
   /* Ein- und Ausstempeln über denselben Knopf: läuft eine Stempelung,
      wird sie beendet, sonst eine neue begonnen. */
+  /* Pause: die laufende Stempelung beenden und sofort eine der anderen
+     Art auf derselben Baustelle beginnen. So bleibt es bei hoechstens
+     einer offenen Stempelung je Person — der Index in der Datenbank
+     laesst auch gar nichts anderes zu — und auf dem Stundenzettel
+     steht hinterher, was Arbeit war und was Pause. */
+  const pausieren = async () => {
+    const l = daten.laufend;
+    if (!l) return;
+    const jetztIso = new Date().toISOString();
+    const naechste = (l.art ?? "Arbeit") === "Pause" ? "Arbeit" : "Pause";
+
+    await merken("ausstempeln", { zeitId: l.id, bis: jetztIso }, () => ausstempeln(l.id, jetztIso),
+      (d) => ({ ...d, laufend: null,
+        ZEITEN: d.ZEITEN.map((z) => z.id === l.id
+          ? { ...z, bis: jetztIso, dauer: (new Date(jetztIso) - new Date(z.von)) / 3600000 } : z) }));
+
+    const id = crypto.randomUUID();
+    const n = { betriebId: daten.betriebId, bId: l.baustelle_id, profil: daten.meinProfil,
+                id, von: jetztIso, art: naechste };
+    await merken("einstempeln", n,
+      () => einstempeln(n.betriebId, l.baustelle_id, n.profil, id, jetztIso, naechste),
+      (d) => ({ ...d,
+        laufend: { id, profil_id: d.meinProfil, baustelle_id: l.baustelle_id,
+                   von: jetztIso, bis: null, art: naechste },
+        ZEITEN: [{ id, profil: d.meinProfil, bId: l.baustelle_id, von: jetztIso,
+                   bis: null, art: naechste, dauer: null }, ...d.ZEITEN] }));
+  };
+
   const stempeln = async (baustelleId) => {
     if (daten.laufend) {
       /* Der Zeitpunkt zaehlt jetzt, nicht beim Nachreichen — sonst
@@ -1529,11 +1599,11 @@ export default function App() {
     } else {
       const id = crypto.randomUUID(), von = new Date().toISOString();
       const n = { betriebId: daten.betriebId, bId: baustelleId, profil: daten.meinProfil, id, von };
-      await merken("einstempeln", n,
-        () => einstempeln(n.betriebId, baustelleId, n.profil, id, von),
+      await merken("einstempeln", { ...n, art: "Arbeit" },
+        () => einstempeln(n.betriebId, baustelleId, n.profil, id, von, "Arbeit"),
         (d) => ({ ...d,
-          laufend: { id, profil_id: d.meinProfil, baustelle_id: baustelleId, von, bis: null },
-          ZEITEN: [{ id, profil: d.meinProfil, bId: baustelleId, von, bis: null, dauer: null },
+          laufend: { id, profil_id: d.meinProfil, baustelle_id: baustelleId, von, bis: null, art: "Arbeit" },
+          ZEITEN: [{ id, profil: d.meinProfil, bId: baustelleId, von, bis: null, art: "Arbeit", dauer: null },
                    ...d.ZEITEN] }));
     }
   };
@@ -1636,7 +1706,7 @@ export default function App() {
         )}
 
         {aktiv === "heute" && <Heute u={u} anf={daten.anf} laufend={daten.laufend} stempeln={stempeln}
-          kannZeit={daten.koennen.zeit}
+          pausieren={pausieren} kannZeit={daten.koennen.zeit} kannPause={daten.koennen.pause}
           sek={daten.laufend ? Math.max(0, Math.floor((jetzt - new Date(daten.laufend.von).getTime()) / 1000)) : 0}
           go={(id) => { setDetail(id); setTab("bau"); }} toMat={() => setTab("mat")} />}
 

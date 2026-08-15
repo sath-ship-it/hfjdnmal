@@ -124,7 +124,11 @@ export function Stunden({ zurueck, u, neuLaden }) {
     const t = z.von.slice(0, 10);
     (proTag[t] ??= []).push(z);
   }
-  const summe = dieseWoche.reduce((s, z) => s + (z.dauer ?? 0), 0);
+  /* Pausen zaehlen nicht als Arbeit — genau dafuer stempelt man sie. */
+  const summe = dieseWoche.filter((z) => z.art !== "Pause")
+    .reduce((s, z) => s + (z.dauer ?? 0), 0);
+  const pause = dieseWoche.filter((z) => z.art === "Pause")
+    .reduce((s, z) => s + (z.dauer ?? 0), 0);
   const laufende = dieseWoche.filter((z) => !z.bis).length;
 
   return (
@@ -157,12 +161,14 @@ export function Stunden({ zurueck, u, neuLaden }) {
             <div className="wr-task-s">Summe der Woche</div>
             <div className="wr-mono-b" style={{ fontSize:22 }}>{zahl(summe)} h</div>
           </div>
+          {pause > 0 && <span className="wr-pill">{zahl(pause)} h Pause</span>}
           {laufende > 0 && <span className="wr-pill">{laufende} läuft noch</span>}
         </div>
       </div>
 
       {Object.entries(proTag).sort((a, b) => (a[0] < b[0] ? 1 : -1)).map(([tag, liste]) => {
-        const tagSumme = liste.reduce((s, z) => s + (z.dauer ?? 0), 0);
+        const tagSumme = liste.filter((z) => z.art !== "Pause")
+          .reduce((s, z) => s + (z.dauer ?? 0), 0);
         return (
           <div key={tag}>
             <div className="wr-eyebrow">
@@ -183,14 +189,18 @@ export function Stunden({ zurueck, u, neuLaden }) {
                   <button className="wr-task" style={{ width:"100%", cursor: darf ? "pointer" : "default" }}
                     onClick={() => darf && setOffen(auf ? null : z.id)}>
                     <div style={{ flex:1, minWidth:0, textAlign:"left" }}>
-                      <div className="wr-task-t">{b?.name ?? "Unbekannte Baustelle"}</div>
+                      <div className="wr-task-t">
+                        {z.art === "Pause" ? "Pause" : (b?.name ?? "Unbekannte Baustelle")}
+                      </div>
                       <div className="wr-task-s">
                         {uhr(z.von)} – {z.bis ? uhr(z.bis) : "läuft"}
                         {wer === "alle" ? ` · ${M(z.profil).kurz}` : ""}
                         {darf && (auf ? " · schließen" : " · berichtigen")}
                       </div>
                     </div>
-                    <span className="wr-mono-b">{z.dauer != null ? `${zahl(z.dauer)} h` : "—"}</span>
+                    <span className="wr-mono-b" style={z.art === "Pause" ? { color:"var(--m)" } : {}}>
+                      {z.dauer != null ? `${zahl(z.dauer)} h` : "—"}
+                    </span>
                   </button>
                   {auf && <ZeitKorrektur z={z} fertig={async () => { setOffen(null); await neuLaden(); }} />}
                 </div>

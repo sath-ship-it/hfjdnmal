@@ -89,8 +89,14 @@ export async function ladeAlles() {
      Funktion aus — nicht die ganze App. Vorher legte eine fehlende
      Nebentabelle alles lahm, und der Monteur kam nicht mal an seine
      Baustellen. */
-  const holeWennDa = async (tabelle, spalten = "*", sortier = ["id"]) => {
-    const { daten, fehler } = await seitenweise(tabelle, spalten, sortier);
+  const holeWennDa = async (tabelle, spalten = "*", sortier = ["id"], nachtrag = []) => {
+    const mitAllem = [spalten, ...nachtrag].filter(Boolean).join(",");
+    let { daten, fehler } = await seitenweise(tabelle, mitAllem, sortier);
+    if (fehler && nachtrag.length && fehlendeSpalte(fehler)) {
+      console.warn(`${tabelle}: Spalte ${nachtrag.join(", ")} fehlt — Funktion ist aus.`);
+      nachtrag.forEach((s) => ohneSpalte.add(`${tabelle}.${s}`));
+      ({ daten, fehler } = await seitenweise(tabelle, spalten, sortier));
+    }
     if (fehler) {
       if (fehler.code === "PGRST205" || /schema cache/i.test(fehler.message || "")) {
         console.warn(`Tabelle "${tabelle}" fehlt — zugehörige Funktion ist aus.`);
@@ -113,7 +119,7 @@ export async function ladeAlles() {
       hole("anforderung"),
       hole("lv_position"),
       hole("aufmass_zeile"),
-      holeWennDa("zeit", "id,profil_id,baustelle_id,von,bis,geloescht_am"),
+      holeWennDa("zeit", "id,profil_id,baustelle_id,von,bis,geloescht_am", ["id"], ["art"]),
       holeWennDa("foto", "id,zeile_id,bericht_id,baustelle_id,pfad,erstellt_am"),
       holeWennDa("tagesbericht", "id,baustelle_id,profil_id,datum,text"),
       holeWennDa("lv_preis", "position_id,ep", ["position_id"]),
@@ -205,6 +211,7 @@ export async function ladeAlles() {
 
   const ZEITEN = zeitenDa
     .map((z) => ({ id:z.id, profil:z.profil_id, bId:z.baustelle_id, von:z.von, bis:z.bis,
+                   art: z.art ?? "Arbeit",
                    dauer: z.bis ? (new Date(z.bis) - new Date(z.von)) / 3600000 : null }))
     .sort((a, b) => new Date(b.von) - new Date(a.von));
 
@@ -224,7 +231,8 @@ export async function ladeAlles() {
                     preise: lvPreise !== null && lvPreise.length >= 0 && artPreise !== null,
                     /* Ohne Nachtrag 0005 gibt es keinen Strichcode: dann
                        weder Scanner anbieten noch beim Speichern mitschicken. */
-                    ean: !ohneSpalte.has("artikel.ean") };
+                    ean: !ohneSpalte.has("artikel.ean"),
+                    pause: !ohneSpalte.has("zeit.art") };
 
   return { meinProfil, betriebId, betrieb: betriebe[0]?.name ?? "", team, B, ARTIKEL, anf, POS, ZEILEN,
            ZEITEN, BERICHTE, FOTOS, laufend, koennen };
@@ -281,8 +289,8 @@ export async function bestellen(ids, liefertermin) {
    Bei einem Handwerksbetrieb sind Stunden die Rechnungsgrundlage —
    das gehört auf den Server. */
 
-export async function einstempeln(betriebId, baustelleId, meinProfil, vorgabe, von) {
-  const { error } = await supabase.from("zeit").insert({
+export async function einstempeln(betriebId, baustelleId, meinProfil, vorgabe, von, art) {
+  const satz = {
     id: vorgabe ?? crypto.randomUUID(),
     betrieb_id: betriebId,
     profil_id: meinProfil,
@@ -290,7 +298,14 @@ export async function einstempeln(betriebId, baustelleId, meinProfil, vorgabe, v
     /* Beim Nachreichen zaehlt der Zeitpunkt des Stempelns, nicht der
        des Uebertragens — sonst verschenkt der Monteur seine Stunden. */
     ...(von ? { von } : {}),
-  });
+  };
+  /* Ohne Nachtrag 0006 gibt es die Spalte nicht. Dann eben ohne — eine
+     Stempelung ohne Art ist immer noch besser als gar keine. */
+  let { error } = await supabase.from("zeit").insert(art ? { ...satz, art } : satz);
+  if (art && error && (error.code === "42703" || error.code === "PGRST204"
+                       || /column .* does not exist|'art' column/i.test(error.message || ""))) {
+    ({ error } = await supabase.from("zeit").insert(satz));
+  }
   /* Der Index zeit_eine_laufende verhindert zwei offene Stempelungen —
      etwa wenn jemand Handy und Tablet benutzt. */
   if (error) {
@@ -560,7 +575,7 @@ export async function vorgangAusfuehren(art, n) {
     case "aufmass":     return aufmassSpeichern(n.betriebId, n.posId, n.ort, n.ansatz, n.menge, n.profil, n.id);
     case "anforderung": return anforderungSenden(n.betriebId, n.bId, n.korb, n.wann, n.dringend, n.profil, n.ids);
     case "bericht":     return berichtSpeichern(n.betriebId, n.bId, n.text, n.profil, n.id);
-    case "einstempeln": return einstempeln(n.betriebId, n.bId, n.profil, n.id, n.von);
+    case "einstempeln": return einstempeln(n.betriebId, n.bId, n.profil, n.id, n.von, n.art);
     case "ausstempeln": return ausstempeln(n.zeitId, n.bis);
     default: throw new Error("Unbekannter Vorgang: " + art);
   }

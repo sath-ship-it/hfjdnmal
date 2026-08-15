@@ -45,7 +45,9 @@ export default function Abrechnung({ u, oeffne }) {
         const a = ARTIKEL.find((y) => y.id === x.aId);
         return s + x.menge * (a?.ek ?? 0);
       }, 0),
-      stunden: ZEITEN.filter((z) => z.bId === b.id)
+      /* Pausen sind keine Leistung und gehoeren nicht in die
+         Nachkalkulation. */
+      stunden: ZEITEN.filter((z) => z.bId === b.id && z.art !== "Pause")
         .reduce((s, z) => s + (z.dauer ?? 0), 0),
       posten: pos.length,
     };
